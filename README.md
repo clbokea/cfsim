@@ -17,12 +17,12 @@ You need Python 3.8 or newer. Each version is on the
 [releases page](https://github.com/clbokea/cfsim/releases) as a zip file.
 
 ```
-pip install https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip
+pip install https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip
 pip install cflib                 # only needed to fly the real drones
 ```
 
-Other ways: download the zip and run `pip install cfsim-1.0.2.zip`, use
-`pip install git+https://github.com/clbokea/cfsim.git@v1.0.2`, or
+Other ways: download the zip and run `pip install cfsim-1.0.3.zip`, use
+`pip install git+https://github.com/clbokea/cfsim.git@v1.0.3`, or
 `pip install .` in a clone of this repository.
 
 The examples are not installed with the package. Get them from the
@@ -45,7 +45,7 @@ needs.
 ```
 uv init drone-course
 cd drone-course
-uv add "cfsim @ https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip"
+uv add "cfsim @ https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip"
 uv add cflib                      # only needed to fly the real drones
 
 uv run python -m cfsim my_script.py      # simulator
@@ -55,7 +55,7 @@ uv run python my_script.py               # real Crazyflie
 **Quick try**, without a project:
 
 ```
-uv run --with https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip python -m cfsim my_script.py
+uv run --with https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip python -m cfsim my_script.py
 ```
 
 **In a clone of this repository** – uv installs cfsim and the dev tools
@@ -142,7 +142,7 @@ uv run jupyter lab notebook_demo.ipynb
 **Without a project:**
 
 ```
-uv run --with jupyterlab --with https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip jupyter lab notebook_demo.ipynb
+uv run --with jupyterlab --with https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip jupyter lab notebook_demo.ipynb
 ```
 
 **VS Code:** run `uv sync` (in a clone) or `uv add --dev ipykernel` (in your
@@ -150,7 +150,7 @@ own project), open the `.ipynb` file, choose *Select Kernel → Python
 Environments → .venv*, and press *Run All*.
 
 **Google Colab / JupyterHub:** install in the first cell with
-`!pip install https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip`,
+`!pip install https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip`,
 use `cfsim.enable(viewer=False)`, and look at the pictures from `cfsim.show()`.
 
 ## Options
