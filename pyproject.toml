@@ -11,6 +11,14 @@ requires-python = ">=3.8"
 license = {text = "MIT"}
 dependencies = ["matplotlib>=3.5"]
 
+[project.urls]
+Homepage = "https://github.com/clbokea/cfsim"
+
+[dependency-groups]
+# Not installed with cfsim itself. `uv sync` / `uv run` in this repo add them,
+# so `uv run jupyter lab examples/notebook_demo.ipynb` works out of the box.
+dev = ["jupyterlab>=4", "ipykernel"]
+
 [tool.setuptools.packages.find]
 include = ["cfsim*"]
 

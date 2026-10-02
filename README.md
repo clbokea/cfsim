@@ -13,16 +13,59 @@ python my_script.py               # real Crazyflie (needs a Crazyradio)
 
 ## Installation
 
-You need Python 3.8 or newer.
+You need Python 3.8 or newer. Each version is on the
+[releases page](https://github.com/clbokea/cfsim/releases) as a zip file.
 
 ```
-pip install ./cfsim               # from the folder containing pyproject.toml
+pip install https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip
 pip install cflib                 # only needed to fly the real drones
 ```
 
-(Or from a zip file: `pip install cfsim-1.0.2.zip`.)
+Other ways: download the zip and run `pip install cfsim-1.0.2.zip`, use
+`pip install git+https://github.com/clbokea/cfsim.git@v1.0.2`, or
+`pip install .` in a clone of this repository.
 
-Check that it works:
+The examples are not installed with the package. Get them from the
+[examples folder](https://github.com/clbokea/cfsim/tree/main/examples), or
+clone the repository:
+
+```
+git clone https://github.com/clbokea/cfsim.git
+```
+
+### With uv (recommended)
+
+[uv](https://docs.astral.sh/uv/) creates and manages the virtual environment
+for you – no activating needed, just put `uv run` in front of the command.
+Python installed by uv also includes the window toolkit (tkinter) the 3D view
+needs.
+
+**Your own project** (one folder for your scripts):
+
+```
+uv init drone-course
+cd drone-course
+uv add "cfsim @ https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip"
+uv add cflib                      # only needed to fly the real drones
+
+uv run python -m cfsim my_script.py      # simulator
+uv run python my_script.py               # real Crazyflie
+```
+
+**Quick try**, without a project:
+
+```
+uv run --with https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip python -m cfsim my_script.py
+```
+
+**In a clone of this repository** – uv installs cfsim and the dev tools
+(Jupyter) automatically:
+
+```
+uv run python -m cfsim examples/01_hello_fly.py
+```
+
+### Check that it works
 
 ```
 python -m cfsim --list-worlds
@@ -74,8 +117,41 @@ cfsim.enable(world='obstacles')          # first cell
 - `cfsim.reset()` puts all drones back at their start spots, so you can re-run
   a flight cell.
 - To change the world or other options, restart the kernel.
+- Always run the cells from the top: `cfsim.enable()` must run before the
+  cflib imports.
 
 See `examples/notebook_demo.ipynb`.
+
+### Running the notebook
+
+**In a clone of this repository** (Jupyter is a dev dependency, so uv
+installs it):
+
+```
+uv run jupyter lab examples/notebook_demo.ipynb
+```
+
+**In your own uv project**, download the notebook and add Jupyter:
+
+```
+curl -O https://raw.githubusercontent.com/clbokea/cfsim/main/examples/notebook_demo.ipynb
+uv add --dev jupyterlab
+uv run jupyter lab notebook_demo.ipynb
+```
+
+**Without a project:**
+
+```
+uv run --with jupyterlab --with https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip jupyter lab notebook_demo.ipynb
+```
+
+**VS Code:** run `uv sync` (in a clone) or `uv add --dev ipykernel` (in your
+own project), open the `.ipynb` file, choose *Select Kernel → Python
+Environments → .venv*, and press *Run All*.
+
+**Google Colab / JupyterHub:** install in the first cell with
+`!pip install https://github.com/clbokea/cfsim/releases/download/v1.0.2/cfsim-1.0.2.zip`,
+use `cfsim.enable(viewer=False)`, and look at the pictures from `cfsim.show()`.
 
 ## Options
 
@@ -185,6 +261,7 @@ starts facing +x (to the right). Run it with `--world my_world.txt`.
 | `04_go_to_points.py` | flying to coordinates (`PositionHlCommander`) |
 | `05_swarm.py` | three drones at once (`Swarm`); try `--world arena` |
 | `06_low_level_setpoints.py` | continuous setpoints and the watchdog |
+| `notebook_demo.ipynb` | flying from a Jupyter notebook, `cfsim.show()` and `cfsim.reset()` |
 
 ## Troubleshooting
 
