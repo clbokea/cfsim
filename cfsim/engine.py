@@ -179,6 +179,7 @@ class Engine:
         env = dict(os.environ)
         pkg_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env['PYTHONPATH'] = pkg_parent + os.pathsep + env.get('PYTHONPATH', '')
+        env.pop('MPLBACKEND', None)            # Jupyter sets an inline backend; we need a window
         try:
             self._viewer = subprocess.Popen(
                 [sys.executable, '-m', 'cfsim.viewer'], stdin=subprocess.PIPE,

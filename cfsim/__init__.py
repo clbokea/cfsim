@@ -16,8 +16,8 @@ import importlib.abc
 import importlib.util
 import sys
 
-__version__ = '1.0.1'
-__all__ = ['enable', 'is_enabled', 'worlds']
+__version__ = '1.0.2'
+__all__ = ['enable', 'is_enabled', 'worlds', 'show', 'reset']
 
 _enabled = False
 
@@ -98,3 +98,21 @@ def is_enabled():
 def worlds():
     from .world import builtin_worlds
     return builtin_worlds()
+
+
+def show(figsize=(12, 5)):
+    """Draw the world, drones and flight paths in this process.
+    In a Jupyter notebook the picture appears below the cell."""
+    from .plot import show as _show
+    _show(figsize)
+
+
+def reset():
+    """Remove all simulated drones (they reappear at their start spots the
+    next time a script connects). Handy for re-running notebook cells.
+    Call it after all `with SyncCrazyflie(...)` blocks have finished."""
+    from .engine import get_engine
+    eng = get_engine()
+    with eng.lock:
+        eng.drones.clear()
+    eng.message('reset: all drones removed')

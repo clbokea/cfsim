@@ -20,7 +20,7 @@ pip install ./cfsim               # from the folder containing pyproject.toml
 pip install cflib                 # only needed to fly the real drones
 ```
 
-(Or from a zip file: `pip install cfsim-1.0.1.zip`.)
+(Or from a zip file: `pip install cfsim-1.0.2.zip`.)
 
 Check that it works:
 
@@ -54,6 +54,28 @@ import cflib.crtp
 
 `cfsim.enable()` accepts the same options as the command line, for example
 `cfsim.enable(world='obstacles', model='brushless')`.
+
+## Using cfsim in a Jupyter notebook
+
+Put `cfsim.enable()` in the first cell, before any cflib import. Flying works
+the same as in a script; the cell runs until the flight is finished.
+
+```python
+import cfsim
+cfsim.enable(world='obstacles')          # first cell
+```
+
+- On your own computer (Jupyter or VS Code notebooks) the live 3D view opens
+  as a separate window, as with scripts.
+- `cfsim.show()` draws the world and the flight paths **inside the notebook**,
+  below the cell. This also works in online notebooks (JupyterHub, Google
+  Colab) where no separate window can open – use `cfsim.enable(viewer=False)`
+  there.
+- `cfsim.reset()` puts all drones back at their start spots, so you can re-run
+  a flight cell.
+- To change the world or other options, restart the kernel.
+
+See `examples/notebook_demo.ipynb`.
 
 ## Options
 
