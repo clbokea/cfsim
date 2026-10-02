@@ -68,6 +68,8 @@ class Crazyflie:
         self.link_uri = link_uri
         self.connection_requested.call(link_uri)
         self.state = State.INITIALIZED
+        from cfsim import notebook
+        notebook.on_connect()                        # live picture in Jupyter notebooks
 
         def connect():
             time.sleep(0.3)                          # pretend radio handshake

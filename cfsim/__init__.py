@@ -17,7 +17,7 @@ import importlib.util
 import sys
 
 __version__ = '1.0.3'
-__all__ = ['enable', 'is_enabled', 'worlds', 'show', 'reset']
+__all__ = ['enable', 'is_enabled', 'worlds', 'show', 'replay', 'reset']
 
 _enabled = False
 
@@ -58,7 +58,7 @@ class _CflibAliasFinder(importlib.abc.MetaPathFinder):
 
 def enable(world='room', model='2.1+', positioning='flow', noise=True,
            decks=('flow', 'multiranger'), viewer=True, battery_drain=1.0,
-           models=None, start_positions=None, quiet=False):
+           models=None, start_positions=None, quiet=False, inline=True):
     """Switch cflib to the simulator. Call before importing anything from cflib.
 
     world:           'room', 'corridor', 'maze', 'obstacles', 'arena', 'open'
@@ -73,6 +73,8 @@ def enable(world='room', model='2.1+', positioning='flow', noise=True,
     battery_drain:   e.g. 10 makes the battery run out 10x faster
     start_positions: {uri: (x, y)} to place drones yourself
     quiet:           do not print simulator messages
+    inline:          in a Jupyter notebook, show a live picture below the
+                     running cell (False: only the separate window)
     """
     global _enabled
     existing = sys.modules.get('cflib')
@@ -84,7 +86,8 @@ def enable(world='room', model='2.1+', positioning='flow', noise=True,
     engine.configure(world=world, model=model, positioning=positioning, noise=noise,
                      decks=decks, viewer=viewer, battery_drain=battery_drain,
                      models=dict(models or {}),
-                     start_positions=dict(start_positions or {}), quiet=quiet)
+                     start_positions=dict(start_positions or {}), quiet=quiet,
+                     inline=inline)
     engine.World.load(world)                 # fail early on a bad world name
     if not _enabled:
         sys.meta_path.insert(0, _CflibAliasFinder())
@@ -107,12 +110,21 @@ def show(figsize=(12, 5)):
     _show(figsize)
 
 
+def replay(speed=1.0, fps=8, figsize=(10, 4), max_frames=200):
+    """Play the recorded flight back as an animation (in a Jupyter notebook,
+    below the cell). speed=2 plays twice as fast. Long pauses are shortened."""
+    from .plot import replay as _replay
+    return _replay(speed=speed, fps=fps, figsize=figsize, max_frames=max_frames)
+
+
 def reset():
     """Remove all simulated drones (they reappear at their start spots the
-    next time a script connects). Handy for re-running notebook cells.
+    next time a script connects) and forget the recorded flight.
+    Handy for re-running notebook cells.
     Call it after all `with SyncCrazyflie(...)` blocks have finished."""
     from .engine import get_engine
     eng = get_engine()
     with eng.lock:
         eng.drones.clear()
+        eng.history.clear()
     eng.message('reset: all drones removed')

@@ -14,6 +14,8 @@ from .world import World
 
 PHYSICS_HZ = 100
 VIEWER_HZ = 20
+HISTORY_HZ = 10            # flight recording for cfsim.replay()
+HISTORY_MAX = 36000        # samples kept (an hour of flying at 10 Hz)
 
 _engine = None
 _config = {
@@ -27,6 +29,7 @@ _config = {
     'battery_drain': 1.0,      # 10 = battery drains 10x faster
     'start_positions': {},     # uri -> (x, y)
     'quiet': False,
+    'inline': True,            # live picture below the running notebook cell
 }
 
 
@@ -71,6 +74,8 @@ class Engine:
         self._viewer = None
         self._viewer_ok = cfg['viewer']
         self._thread = None
+        self.history = []          # (t, ((uri, x, y, z, yaw, crashed), ...))
+        self.history_info = {}     # uri -> (label, color, model)
 
     # ------------------------------------------------------------- basics
     def now(self):
@@ -137,6 +142,7 @@ class Engine:
         dt = 1.0 / PHYSICS_HZ
         next_t = time.monotonic()
         last_view = 0.0
+        last_rec = 0.0
         self._frame = 0
         while True:
             now_wall = time.monotonic()
@@ -157,6 +163,21 @@ class Engine:
             if self.now() - last_view >= 1.0 / VIEWER_HZ:
                 last_view = self.now()
                 self._send_state()
+            if self.now() - last_rec >= 1.0 / HISTORY_HZ:
+                last_rec = self.now()
+                self._record()
+
+    def _record(self):
+        with self.lock:
+            sample = tuple((d.uri, round(d.pos[0], 3), round(d.pos[1], 3), round(d.pos[2], 3),
+                            round(d.yaw, 1), d.crashed) for d in self.drones.values())
+            if self.history and self.history[-1][1] == sample:
+                return                         # nothing moved: keep the recording short
+            for d in self.drones.values():
+                self.history_info.setdefault(d.uri, (d.label, d.m['color'], d.m['label']))
+            self.history.append((round(self.now(), 2), sample))
+            if len(self.history) > HISTORY_MAX:
+                del self.history[:HISTORY_MAX // 10]
 
     def _drone_collisions(self):
         ds = [d for d in self.drones.values() if not d.on_ground or d.motors]

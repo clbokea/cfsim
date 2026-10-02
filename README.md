@@ -108,14 +108,21 @@ import cfsim
 cfsim.enable(world='obstacles')          # first cell
 ```
 
-- On your own computer (Jupyter or VS Code notebooks) the live 3D view opens
-  as a separate window, as with scripts.
-- `cfsim.show()` draws the world and the flight paths **inside the notebook**,
-  below the cell. This also works in online notebooks (JupyterHub, Google
-  Colab) where no separate window can open – use `cfsim.enable(viewer=False)`
-  there.
-- `cfsim.reset()` puts all drones back at their start spots, so you can re-run
-  a flight cell.
+- **Live picture**: while a flight cell runs, a picture below the cell
+  follows the drones (a few times per second). This also works in online
+  notebooks (JupyterHub, Google Colab) where no separate window can open – use
+  `cfsim.enable(viewer=False)` there. `cfsim.enable(inline=False)` switches
+  the live picture off.
+- On your own computer (Jupyter or VS Code notebooks) the live 3D view also
+  opens as a separate window, as with scripts.
+- `cfsim.replay()` plays the flight back as an animation below the cell, with
+  buttons to pause, step and change the speed. `cfsim.replay(speed=2)` plays
+  it twice as fast; long pauses are shortened. The animation is stored in the
+  notebook (a few MB), so clear the output before sharing the notebook if size
+  matters.
+- `cfsim.show()` draws the world and the flight paths as a still picture.
+- `cfsim.reset()` puts all drones back at their start spots and forgets the
+  recorded flight, so you can re-run a flight cell.
 - To change the world or other options, restart the kernel.
 - Always run the cells from the top: `cfsim.enable()` must run before the
   cflib imports.
@@ -167,6 +174,7 @@ use `cfsim.enable(viewer=False)`, and look at the pictures from `cfsim.show()`.
 | `--no-viewer` | `viewer=False` | no window (faster, for testing) |
 | | `start_positions={uri: (x, y)}` | place drones yourself |
 | | `quiet=True` | hide simulator messages |
+| | `inline=False` | no live picture below notebook cells |
 
 Every URI is a separate simulated drone, so you can keep the real radio
 addresses in your scripts.
@@ -261,7 +269,7 @@ starts facing +x (to the right). Run it with `--world my_world.txt`.
 | `04_go_to_points.py` | flying to coordinates (`PositionHlCommander`) |
 | `05_swarm.py` | three drones at once (`Swarm`); try `--world arena` |
 | `06_low_level_setpoints.py` | continuous setpoints and the watchdog |
-| `notebook_demo.ipynb` | flying from a Jupyter notebook, `cfsim.show()` and `cfsim.reset()` |
+| `notebook_demo.ipynb` | flying from a Jupyter notebook: live picture, `cfsim.replay()`, `cfsim.show()`, `cfsim.reset()` |
 
 ## Troubleshooting
 
