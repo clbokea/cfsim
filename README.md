@@ -20,7 +20,7 @@ pip install ./cfsim               # from the folder containing pyproject.toml
 pip install cflib                 # only needed to fly the real drones
 ```
 
-(Or from a zip file: `pip install cfsim-1.0.0.zip`.)
+(Or from a zip file: `pip install cfsim-1.0.1.zip`.)
 
 Check that it works:
 
@@ -166,8 +166,12 @@ starts facing +x (to the right). Run it with `--world my_world.txt`.
 
 ## Troubleshooting
 
-- **No window appears**: check that matplotlib is installed
-  (`pip install matplotlib`). The simulation also runs without the window.
+- **No window appears**: first look behind your other windows, or for a
+  Python icon in the Dock/taskbar. Then run `python -m cfsim.viewer --check`:
+  it opens a test window, or prints why it can't (no screen, e.g. over SSH or
+  in a container; or no window toolkit – on macOS with Homebrew Python run
+  `brew install python-tk`, on Linux `sudo apt install python3-tk`). The
+  simulation also runs without the window.
 - **"cflib was imported before cfsim.enable()"**: move `import cfsim` and
   `cfsim.enable()` to the very top of the script.
 - **"... is not available in the cfsim simulator"**: the script uses a part of

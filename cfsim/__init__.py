@@ -16,7 +16,7 @@ import importlib.abc
 import importlib.util
 import sys
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __all__ = ['enable', 'is_enabled', 'worlds']
 
 _enabled = False

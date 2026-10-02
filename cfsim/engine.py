@@ -189,6 +189,13 @@ class Engine:
             return
         self._send({'type': 'world', 'world': self.world.to_dict()})
         atexit.register(self._final_state)
+        self.message('3D view opens in a separate window (it may appear behind this one)')
+
+        def watch(proc):
+            code = proc.wait()
+            if code == 3:                      # the viewer explained the problem itself
+                self._viewer = None
+        threading.Thread(target=watch, args=(self._viewer,), daemon=True).start()
 
     def _send(self, obj):
         v = self._viewer

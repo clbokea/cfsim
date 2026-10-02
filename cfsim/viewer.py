@@ -46,11 +46,75 @@ def _box_faces(x1, y1, x2, y2, h):
     return faces
 
 
+NON_INTERACTIVE = ('agg', 'pdf', 'svg', 'ps', 'cairo', 'template', 'pgf')
+
+
+def _no_window(reason):
+    print('\n[cfsim] The 3D view could not be opened: ' + reason +
+          '\n[cfsim] The simulation itself still runs. Run "python -m cfsim.viewer --check" '
+          'to test the window on its own.\n', file=sys.stderr, flush=True)
+    sys.exit(3)
+
+
+def _pick_backend(matplotlib):
+    """Choose a matplotlib backend that can open a window, or explain why not."""
+    if sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or
+                                                 os.environ.get('WAYLAND_DISPLAY')):
+        _no_window('there is no screen available (DISPLAY is not set). This happens over '
+                   'SSH, in WSL without a display, or inside a container without a desktop.')
+    current = matplotlib.get_backend()
+    if current.lower() not in NON_INTERACTIVE and not current.startswith('module://'):
+        return current
+    import importlib
+    for b in ('macosx', 'TkAgg', 'QtAgg', 'Qt5Agg', 'GTK3Agg', 'WXAgg'):
+        try:
+            importlib.import_module('matplotlib.backends.backend_' + b.lower())
+            matplotlib.use(b, force=True)
+            return b
+        except Exception:
+            continue
+    hint = {'darwin': 'brew install python-tk   (or use Python from python.org)',
+            'win32': 'reinstall Python from python.org with "tcl/tk and IDLE" ticked'}.get(
+        sys.platform, 'sudo apt install python3-tk')
+    _no_window('matplotlib found no window toolkit (backend "%s"). Fix: %s' % (current, hint))
+
+
+def _raise_window(fig):
+    try:
+        win = fig.canvas.manager.window
+        if hasattr(win, 'attributes'):          # Tk
+            win.attributes('-topmost', 1)
+            win.after(1500, lambda: win.attributes('-topmost', 0))
+        elif hasattr(win, 'raise_'):            # Qt
+            win.raise_()
+            win.activateWindow()
+    except Exception:
+        pass
+
+
+def _check():
+    """python -m cfsim.viewer --check : open a test window."""
+    import matplotlib
+    backend = _pick_backend(matplotlib)
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(5, 3))
+    fig.text(0.5, 0.5, 'cfsim viewer works!\n(backend: %s)\nClose this window.' % backend,
+             ha='center', va='center', fontsize=13)
+    _raise_window(fig)
+    print('[cfsim] A test window should be open now (backend %s).' % backend)
+    plt.show()
+
+
 def main():
+    if '--check' in sys.argv:
+        _check()
+        return
     snapshot = os.environ.get('CFSIM_SNAPSHOT')
     import matplotlib
     if snapshot:
         matplotlib.use('Agg')
+    else:
+        _pick_backend(matplotlib)
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
     from matplotlib.patches import Rectangle
@@ -217,8 +281,17 @@ def main():
         return
 
     anim = FuncAnimation(fig, update, interval=60, cache_frame_data=False)  # noqa: F841
-    plt.show()
+    _raise_window(fig)
+    try:
+        plt.show()
+    except Exception as e:
+        _no_window(f'{type(e).__name__}: {e}')
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as e:
+        _no_window(f'{type(e).__name__}: {e}')
