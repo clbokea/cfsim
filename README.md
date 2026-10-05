@@ -275,12 +275,20 @@ To fly in a real building, make the world from an architectural drawing:
 python -m cfsim --editor
 ```
 
-The room editor opens in the browser. Load a floor plan image (PNG or JPG;
-export PDFs as an image first), set the scale by clicking two points with a
-known distance, choose the area, let the editor find the walls, clean up
-(erase text, furniture and door swings, paint missing walls), place the start
-`S`, and save. You get `my_room.txt` and the cropped plan image `my_room.png`
-in the folder where you started the editor; keep them together. Then:
+The room editor opens in the browser and has four steps:
+
+1. **Open the floor plan** (PNG or JPG; export PDFs as an image first). The
+   editor finds the building and its walls by itself; text, door swings,
+   furniture and dimension lines are cleaned away automatically.
+2. **Type how wide the building is** – the overall width written on the plan.
+   That one number sets the scale.
+3. **Click where the drone starts.**
+4. **Save.** You get `my_room.txt` and the plan image `my_room.png` in the
+   folder where you started the editor; keep them together.
+
+If the walls are not right, open **Fine-tune**: clean-up strength, darkness,
+cell size, paint and erase, choosing the area by hand, measuring another
+distance, more start spots, and the ceiling height. Then:
 
 ```
 python -m cfsim --viewer browser --world my_room.txt my_script.py

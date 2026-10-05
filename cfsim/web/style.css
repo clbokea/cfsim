@@ -120,3 +120,6 @@ code { font-size: 12px; background: var(--accent-soft); padding: 1px 4px; border
   .editor { grid-template-columns: 1fr; grid-template-rows: auto 60vh; }
   .side { border-right: 0; border-bottom: 1px solid var(--line); max-height: 45vh; }
 }
+.step summary { cursor: pointer; }
+.step h3 { font-size: 13px; margin: 14px 0 2px; }
+.step input[type=number]#widthM { width: 80px; }

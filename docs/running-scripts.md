@@ -252,24 +252,21 @@ python -m cfsim --editor
 
 It opens in the browser and saves into the folder you started it from.
 
-1. **Floor plan** – choose a PNG or JPG image of the plan. (A PDF must be
-   exported as an image first, e.g. with *Export* in Preview or a screenshot.)
-   *Try the example plan* loads a small demo building.
-2. **Scale** – click **Measure**, click both ends of a dimension line or a scale
-   bar, type its length in metres and press Enter.
-3. **Area** – drag a rectangle around the part you want, without titles and
-   dimension lines.
-4. **Walls** – dark parts of the plan become walls (red). *Dark below* sets how
-   dark a pixel must be, *Cell is wall if* how much of a cell must be dark;
-   *Cell size* is the grid (10 cm is a good start). Then clean up with
-   **Erase** (text, furniture, door swings, dimension lines) and
-   **Paint wall** (gaps that should be closed). Doors you want to fly through
-   must be free. *Close the outline* adds a wall around the area.
-5. **Start spots** – **Place S** where the first drone takes off; **Add 1–9**
-   for more drones.
-6. **Save** – give it a name and the ceiling height, and click
-   **Save in the folder**. You get `name.txt` (the world) and `name.png`
-   (the cropped plan). Keep both in the same folder.
+1. **Open the floor plan** – choose a PNG or JPG image of the plan. (A PDF must
+   be exported as an image first, e.g. with *Export* in Preview or a
+   screenshot.) *Try the example plan* loads a small demo building.
+   The editor finds the building by itself (the blue box) and marks its walls
+   in red. Text, door swings, furniture and dimension lines are thin, so they
+   are removed automatically.
+2. **How wide is the building?** – type the overall width from the
+   measurements on the plan (the dimension along the whole building, outside
+   wall to outside wall) and press Enter. The editor then shows the size of
+   the building in metres – check the depth against the plan too.
+3. **Where does the drone start?** – click on the plan where the drone takes
+   off.
+4. **Save** – give it a name and click **Save in the folder**. You get
+   `name.txt` (the world) and `name.png` (the plan). Keep both in the same
+   folder.
 
 Then fly in it:
 
@@ -281,14 +278,25 @@ The floor plan is drawn on the floor under the walls, so you can check that
 the walls are in the right places. The world also works in the normal window
 and in notebooks (`cfsim.enable(world='name.txt')`).
 
+**Fine-tune** (only if the walls are not right):
+
+| Problem | What to do |
+| --- | --- |
+| The blue box is not the building | *Area*: **Select area** and drag your own box, then type the width of that box. |
+| You know another length, not the width | *Scale from another measurement*: **Measure**, click both ends, type the length. |
+| A wall has gaps or is missing | **Paint wall**, or lower *Cell is wall if*. |
+| Something that is not a wall is red | **Erase** it, or choose a stronger *Clean-up*. |
+| Thin walls disappear | Choose *Clean-up: lines under 3 cm* or *off*. |
+| Walls are drawn as two thin lines (not filled) | Set *Clean-up* to *off*, lower *Cell is wall if*, and paint the walls where needed. |
+| A door should be open | **Erase** the wall across the doorway – the drone can only fly through free cells. |
+| More drones | **Add start 1–9**. |
+
 Tips:
 
-- The cleaner the drawing, the less cleaning up. Plans with only walls (no
-  furniture layer) work best.
-- Check the scale: the editor shows the size of the plan in metres after
-  step 2.
-- A wall thinner than one cell may get gaps; use a smaller cell size, a lower
-  *Cell is wall if*, or paint it.
+- Plans where walls are filled black or grey (the usual 1:100 or 1:50
+  architectural style) work best.
+- Doors drawn closed (a line across the opening) stay closed only if the line
+  is thick; thin door lines are removed by the clean-up, so doors are open.
 
 ## 8. When something does not work
 

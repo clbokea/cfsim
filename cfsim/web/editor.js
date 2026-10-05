@@ -1,12 +1,20 @@
 // cfsim room editor: turns a floor plan image into a cfsim world (.txt map).
 //
+// The simple flow: open a plan -> the building is found automatically (the
+// largest group of thick dark lines) -> type its width (that gives the scale)
+// -> click the start -> save. Everything else is under "Fine-tune".
+//
 // Everything the user does is kept in image pixel coordinates (scale points,
 // area, paint strokes, start spots), so changing the cell size or the
 // darkness settings never loses work. The grid of walls is recomputed from
 // that whenever something changes:
 //   1. the image is converted to brightness once (at most 2000 px wide),
-//   2. per threshold, a summed-area table counts dark pixels quickly,
-//   3. a cell is a wall if enough of it is dark, then paint/erase strokes apply.
+//   2. dark pixels are cleaned up: a morphological opening removes every line
+//      thinner than the clean-up size (text, door swings, furniture, dimension
+//      lines) and keeps walls,
+//   3. a summed-area table of the cleaned pixels counts dark pixels quickly,
+//   4. a cell is a wall if enough of it is dark; small leftover specks are
+//      removed; then the paint/erase strokes apply.
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -19,7 +27,7 @@ const MAX_CELLS = 2e6;
 const S = {
   img: null, fileName: '', type: 'image/png',
   lum: null, ww: 0, wh: 0, ws: 1,          // brightness image and its scale
-  sat: null, satThr: -1,                   // summed-area table of dark pixels
+  satKey: '', sat: null,                   // summed-area table of cleaned dark pixels
   scale: null,                             // metres per image pixel
   measure: [],                             // up to two points
   crop: null,                              // {x, y, w, h}
@@ -31,12 +39,12 @@ const S = {
 };
 
 const HINTS = {
-  null: 'Drag to move the plan, wheel to zoom. Pick a tool on the left.',
+  null: 'Drag to move the plan, wheel to zoom.',
   measure: 'Click two points whose distance you know, then enter the distance on the left.',
   crop: 'Drag a rectangle around the area to use.',
   wall: 'Click or drag to paint walls. Right-drag moves the plan.',
   erase: 'Click or drag to erase walls (text, furniture, door swings). Right-drag moves the plan.',
-  start: 'Click where the first drone takes off (S).',
+  start: 'Click where the drone takes off.',
   extra: 'Click to add start spots 1–9 for more drones.',
 };
 
@@ -66,14 +74,26 @@ function loadImage(src, fileName, type) {
     for (let i = 0; i < S.lum.length; i++) {
       S.lum[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) | 0;
     }
-    S.satThr = -1;
+    S.satKey = '';
+    const box = detectBuilding();
+    if (box) S.crop = box;
+    $('widthHelp').innerHTML = box
+      ? 'The blue box shows the building the editor found. Type its width from the ' +
+        'measurements on the plan.'
+      : '<span class="error">No building found automatically.</span> Type the width of the ' +
+        'whole image, or select the area by hand under <b>Fine-tune</b>.';
+    $('widthM').value = '';
+    $('scaleInfo').textContent = '';
+    $('saveResult').textContent = '';
     const base = fileName.replace(/\.[^.]*$/, '').replace(/[^A-Za-z0-9_-]+/g, '_') || 'my_room';
     $('name').value = base;
     $('fileInfo').textContent = `${fileName}: ${img.naturalWidth} × ${img.naturalHeight} px`;
     $('legend').hidden = false;
     fitView();
     update();
-    setTool('measure');
+    setTool(null);
+    $('hint').textContent = 'Type the width of the building on the left (step 2).';
+    $('widthM').focus();
   };
   img.onerror = () => { $('fileInfo').innerHTML = '<span class="error">Could not read this image.</span>'; };
   img.src = src;
@@ -87,20 +107,137 @@ $('sample').addEventListener('click', () =>
   loadImage('/static/sample-floorplan.png', 'sample-floorplan.png', 'image/png'));
 
 // ------------------------------------------------------------------- grid
-function darkTable(thr) {
-  if (S.satThr === thr) return S.sat;
+// Summed-area table of a 0/1 image (ww x wh): count of ones in any rectangle.
+function summed(mask) {
   const W = S.ww + 1;
   const sat = new Int32Array(W * (S.wh + 1));
   for (let y = 0; y < S.wh; y++) {
     let row = 0;
     for (let x = 0; x < S.ww; x++) {
-      row += S.lum[y * S.ww + x] < thr ? 1 : 0;
+      row += mask[y * S.ww + x];
       sat[(y + 1) * W + x + 1] = sat[y * W + x + 1] + row;
     }
   }
-  S.sat = sat;
-  S.satThr = thr;
   return sat;
+}
+
+// Ones in the (2r+1) x (2r+1) square around (x, y), and the size of that
+// square cut off at the image border.
+function around(sat, x, y, r) {
+  const W = S.ww + 1;
+  const x0 = Math.max(0, x - r), x1 = Math.min(S.ww, x + r + 1);
+  const y0 = Math.max(0, y - r), y1 = Math.min(S.wh, y + r + 1);
+  return [sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0],
+    (x1 - x0) * (y1 - y0)];
+}
+
+function darkMask(thr) {
+  const m = new Uint8Array(S.ww * S.wh);
+  for (let i = 0; i < m.length; i++) m[i] = S.lum[i] < thr ? 1 : 0;
+  return m;
+}
+
+// Erosion: keep a pixel only if the whole square around it is dark.
+function erode(mask, r) {
+  const sat = summed(mask);
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < S.wh; y++) {
+    for (let x = 0; x < S.ww; x++) {
+      const [n, area] = around(sat, x, y, r);
+      out[y * S.ww + x] = n === area ? 1 : 0;
+    }
+  }
+  return out;
+}
+
+// Dilation: a pixel is dark if any pixel in the square around it is dark.
+function dilate(mask, r) {
+  const sat = summed(mask);
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < S.wh; y++) {
+    for (let x = 0; x < S.ww; x++) out[y * S.ww + x] = around(sat, x, y, r)[0] > 0 ? 1 : 0;
+  }
+  return out;
+}
+
+// Square radius (brightness image px) that removes lines thinner than the
+// clean-up size: an opening with a (2r+1) square removes anything thinner.
+function cleanRadius() {
+  const t = +$('clean').value;
+  if (!t || !S.scale) return 0;
+  return Math.max(0, Math.round((t / S.scale * S.ws - 1) / 2));
+}
+
+// Summed-area table of the cleaned dark pixels (cached).
+function wallTable(thr, r) {
+  const key = thr + '/' + r;
+  if (S.satKey !== key) {
+    let mask = darkMask(thr);
+    if (r > 0) mask = dilate(erode(mask, r), r);     // opening
+    S.sat = summed(mask);
+    S.satKey = key;
+  }
+  return S.sat;
+}
+
+// The building: the largest connected group of thick dark lines (walls are
+// connected; text, a scale bar or a title block next to it are separate).
+// Returns its bounding box in image pixels, or null.
+function detectBuilding() {
+  const r = Math.max(1, Math.round(Math.max(S.ww, S.wh) / 600));
+  const thick = erode(darkMask(+$('thr').value), r);
+  const seen = new Uint8Array(thick.length);
+  const stack = new Int32Array(thick.length);
+  let best = null;
+  for (let start = 0; start < thick.length; start++) {
+    if (!thick[start] || seen[start]) continue;
+    let n = 0, top = 0;
+    let x0 = S.ww, y0 = S.wh, x1 = 0, y1 = 0;
+    stack[top++] = start;
+    seen[start] = 1;
+    while (top) {
+      const i = stack[--top];
+      const x = i % S.ww, y = (i / S.ww) | 0;
+      n++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const j of [i - 1, i + 1, i - S.ww, i + S.ww]) {
+        if (j < 0 || j >= thick.length || seen[j] || !thick[j]) continue;
+        if ((j === i - 1 || j === i + 1) && ((j / S.ww) | 0) !== y) continue;   // row wrap
+        seen[j] = 1;
+        stack[top++] = j;
+      }
+    }
+    if (!best || n > best.n) best = { n, x0, y0, x1, y1 };
+  }
+  if (!best || best.n < 0.0005 * S.ww * S.wh) return null;
+  // undo the erosion (r px on each side), back to image pixels
+  const x = Math.max(0, best.x0 - r), y = Math.max(0, best.y0 - r);
+  const w = Math.min(S.ww, best.x1 + r + 1) - x, h = Math.min(S.wh, best.y1 + r + 1) - y;
+  return { x: x / S.ws, y: y / S.ws, w: w / S.ws, h: h / S.ws };
+}
+
+// Remove groups of wall cells smaller than minCells (specks left by the plan).
+function removeSpecks(data, rows, cols, minCells) {
+  const seen = new Uint8Array(data.length);
+  const group = [];
+  for (let start = 0; start < data.length; start++) {
+    if (!data[start] || seen[start]) continue;
+    group.length = 0;
+    const stack = [start];
+    seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop();
+      group.push(i);
+      const r = (i / cols) | 0, c = i % cols;
+      for (const [rr, cc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+        if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) continue;
+        const j = rr * cols + cc;
+        if (data[j] && !seen[j]) { seen[j] = 1; stack.push(j); }
+      }
+    }
+    if (group.length < minCells) for (const i of group) data[i] = 0;
+  }
 }
 
 function computeGrid() {
@@ -115,7 +252,8 @@ function computeGrid() {
     $('gridInfo').innerHTML = '<span class="error">Too many cells – choose a bigger cell size or a smaller area.</span>';
     return;
   }
-  const sat = darkTable(+$('thr').value);
+  const clean = cleanRadius();
+  const sat = wallTable(+$('thr').value, clean);
   const fill = +$('fill').value / 100;
   const W = S.ww + 1, ws = S.ws;
   const data = new Uint8Array(rows * cols);
@@ -130,6 +268,9 @@ function computeGrid() {
       const dark = sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0];
       if (dark >= fill * (x1 - x0) * (y1 - y0)) data[r * cols + c] = 1;
     }
+  }
+  if (+$('clean').value) {                   // specks smaller than about 0.03 m²
+    removeSpecks(data, rows, cols, Math.max(2, Math.round(0.03 / (cell * cell))));
   }
   for (const e of S.edits) {                 // paint and erase strokes
     const rc = Math.max(0.5, e.r / 2 / cell);
@@ -194,8 +335,13 @@ function draw() {
   ctx.fill('evenodd');
 
   if (S.grid && S.overlay) {
+    ctx.save();
+    ctx.beginPath();                         // the last row/column of cells is only partly
+    ctx.rect(c.x, c.y, c.w, c.h);            // inside the area: do not draw past its edge
+    ctx.clip();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(S.overlay, c.x, c.y, S.grid.cols * S.grid.cellPx, S.grid.rows * S.grid.cellPx);
+    ctx.restore();
   }
   ctx.lineWidth = 1.5 / z;
   ctx.strokeStyle = '#3949ab';
@@ -247,20 +393,49 @@ window.addEventListener('resize', () => draw());
 function steps() {
   $('step1').classList.toggle('done', !!S.img);
   $('step2').classList.toggle('done', !!S.scale);
-  $('step4').classList.toggle('done', !!S.grid);
-  $('step5').classList.toggle('done', S.starts.some((s) => s.ch === 'S'));
+  $('step3').classList.toggle('done', S.starts.some((s) => s.ch === 'S'));
   $('thrV').textContent = $('thr').value;
   $('fillV').textContent = $('fill').value + ' % dark';
 }
 
 // ------------------------------------------------------------------ tools
-function setTool(t) {
-  S.tool = S.tool === t ? null : t;
+// A tool button switches its tool on and off; the steps switch tools on.
+function setTool(t, toggle = false) {
+  S.tool = toggle && S.tool === t ? null : t;
   document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === S.tool));
   $('hint').textContent = S.img ? HINTS[S.tool] : 'Open a floor plan to start.';
   canvas.style.cursor = S.tool ? 'crosshair' : 'grab';
 }
-document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
+document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool, true)));
+
+function scaleText() {
+  const c = S.crop;
+  return `The building is ${(c.w * S.scale).toFixed(2)} × ${(c.h * S.scale).toFixed(2)} m ` +
+    `(1 m = ${(1 / S.scale).toFixed(1)} px). Check it against the plan.`;
+}
+
+$('setWidth').addEventListener('click', () => {
+  const m = parseFloat($('widthM').value);
+  if (!S.img) return;
+  if (!(m > 0)) {
+    $('scaleInfo').innerHTML = '<span class="error">Type the width in metres, e.g. 10 or 12.5.</span>';
+    return;
+  }
+  S.scale = m / S.crop.w;
+  $('scaleInfo').textContent = scaleText();
+  setTool('start');
+  update();
+});
+$('widthM').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('setWidth').click(); });
+$('autoCrop').addEventListener('click', () => {
+  if (!S.img) return;
+  const box = detectBuilding();
+  if (box) S.crop = box;
+  else $('hint').textContent = 'No building found – select the area by hand.';
+  if (S.scale) $('scaleInfo').textContent = scaleText();
+  update();
+});
+$('clean').addEventListener('input', update);
 
 $('setScale').addEventListener('click', () => {
   const m = parseFloat($('measureM').value);
@@ -270,11 +445,10 @@ $('setScale').addEventListener('click', () => {
   }
   const [a, b] = S.measure;
   S.scale = m / Math.hypot(a.x - b.x, a.y - b.y);
-  const w = S.img.naturalWidth * S.scale, h = S.img.naturalHeight * S.scale;
-  $('scaleInfo').textContent = `1 m = ${(1 / S.scale).toFixed(1)} px. The whole image is ` +
-    `${w.toFixed(2)} × ${h.toFixed(2)} m.`;
+  $('widthM').value = (S.crop.w * S.scale).toFixed(2);
+  $('scaleInfo').textContent = scaleText();
   S.measure = [];
-  setTool('crop');
+  setTool(S.starts.length ? null : 'start');
   update();
 });
 $('measureM').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('setScale').click(); });
@@ -326,6 +500,8 @@ canvas.addEventListener('pointerdown', (e) => {
     if (S.tool === 'start') {
       S.starts = S.starts.filter((s) => s.ch !== 'S');
       S.starts.unshift({ x: p.x, y: p.y, ch: 'S' });
+      setTool(null);
+      $('hint').textContent = 'Start placed. Give the world a name and save it (step 4).';
     } else {
       const used = new Set(S.starts.map((s) => s.ch));
       const free = '123456789'.split('').find((d) => !used.has(d));
@@ -363,6 +539,7 @@ canvas.addEventListener('pointerup', () => {
     const x = Math.max(0, dragRect.x), y = Math.max(0, dragRect.y);
     const w = Math.min(iw, dragRect.x + dragRect.w) - x, h = Math.min(ih, dragRect.y + dragRect.h) - y;
     if (w > 10 && h > 10) S.crop = { x, y, w, h };
+    if (S.scale) $('scaleInfo').textContent = scaleText();
     dragRect = null;
     update();
   }
