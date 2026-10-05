@@ -375,3 +375,7 @@ Crazyradio; without cflib you get `ModuleNotFoundError: No module named
 MIT License, Copyright (c) 2026 Claus Bové – see [LICENSE](LICENSE). You may
 use, copy, change and share cfsim freely, also in your own courses, as long as
 the copyright notice and the license text are kept.
+
+The browser view includes [three.js](https://threejs.org/) (MIT License,
+Copyright (c) 2010-2026 three.js authors) in `cfsim/web/vendor/`, with its own
+`LICENSE` file there.
