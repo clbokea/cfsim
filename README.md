@@ -369,3 +369,9 @@ Crazyradio; without cflib you get `ModuleNotFoundError: No module named
   cflib that cfsim does not simulate.
 - **The drone does nothing**: read the `[cfsim]` messages in the terminal –
   they explain why (not armed, thrust lock, crashed, battery empty, ...).
+
+## License
+
+MIT License, Copyright (c) 2026 Claus Bové – see [LICENSE](LICENSE). You may
+use, copy, change and share cfsim freely, also in your own courses, as long as
+the copyright notice and the license text are kept.
