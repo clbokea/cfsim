@@ -11,6 +11,10 @@ python -m cfsim my_script.py      # simulator
 python my_script.py               # real Crazyflie (needs a Crazyradio)
 ```
 
+**Documentation:** [running scripts](docs/running-scripts.md) (step-by-step
+guide for students) · [developer guide](docs/developer-guide.md) (how cfsim
+works inside, how to extend and release it).
+
 ## Installation
 
 You need Python 3.8 or newer. Each version is on the
