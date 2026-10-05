@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # setup-uv has no major-version tags
       - uses: actions/configure-pages@v6
       - name: Build the site
         run: uv run --only-group docs mkdocs build --strict
