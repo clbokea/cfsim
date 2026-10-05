@@ -9,3 +9,7 @@ venv/
 cache/
 .DS_Store
 site/
+
+# Worlds saved with the room editor while testing
+floor_plan.txt
+floor_plan.png
