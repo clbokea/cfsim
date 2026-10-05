@@ -271,8 +271,50 @@ starts facing +x (to the right). Run it with `--world my_world.txt`.
 | `06_low_level_setpoints.py` | continuous setpoints and the watchdog |
 | `notebook_demo.ipynb` | flying from a Jupyter notebook: live picture, `cfsim.replay()`, `cfsim.show()`, `cfsim.reset()` |
 
+### Running the examples in the simulator
+
+Put `python -m cfsim` in front of the script. Run these from the repository
+folder with the virtual environment active (or write `uv run python -m cfsim
+...` instead):
+
+```
+python -m cfsim examples/01_hello_fly.py
+python -m cfsim examples/02_read_sensors.py
+python -m cfsim --world obstacles examples/03_avoid_walls.py
+python -m cfsim examples/04_go_to_points.py
+python -m cfsim --world arena examples/05_swarm.py
+python -m cfsim examples/06_low_level_setpoints.py
+```
+
+A 3D window opens and shows the flight (it may appear behind your other
+windows). It stays open after the script ends; close it when you are done.
+
+Useful options (they go *before* the script name):
+
+```
+python -m cfsim --world maze examples/03_avoid_walls.py      # another world
+python -m cfsim --model brushless examples/01_hello_fly.py   # Brushless drone
+python -m cfsim --no-noise examples/04_go_to_points.py       # perfect sensors
+python -m cfsim --list-worlds                                # show the worlds
+python -m cfsim --help                                       # all options
+```
+
+Your own scripts run the same way: `python -m cfsim my_script.py` in the
+simulator, and later `python my_script.py` on the real drone – the script
+itself does not change.
+
+**`python examples/01_hello_fly.py` (without `-m cfsim`) flies the real
+drone.** It needs the real cflib (`pip install cflib` or `uv add cflib`) and a
+Crazyradio; without cflib you get `ModuleNotFoundError: No module named
+'cflib'`.
+
 ## Troubleshooting
 
+- **`ModuleNotFoundError: No module named 'cflib'`**: the script was started
+  with `python my_script.py`, which means "fly the real drone". Use
+  `python -m cfsim my_script.py` for the simulator (or add `import cfsim` and
+  `cfsim.enable()` at the top of the script). See
+  [Running the examples](#running-the-examples-in-the-simulator).
 - **No window appears**: first look behind your other windows, or for a
   Python icon in the Dock/taskbar. Then run `python -m cfsim.viewer --check`:
   it opens a test window, or prints why it can't (no screen, e.g. over SSH or
