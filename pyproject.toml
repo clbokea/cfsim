@@ -26,4 +26,4 @@ docs = ["mkdocs-material>=9.7", "mkdocs<2"]   # Material does not support MkDocs
 include = ["cfsim*"]
 
 [tool.setuptools.package-data]
-cfsim = ["worlds/*.txt"]
+cfsim = ["worlds/*.txt", "web/*.html", "web/*.js", "web/*.css", "web/*.png", "web/vendor/*"]

@@ -14,11 +14,12 @@ How cfsim works inside, and how to change it. For using cfsim, see
 7. [Worlds (`world.py`)](#7-worlds-worldpy)
 8. [The fake cflib (`_cflib/`)](#8-the-fake-cflib-_cflib)
 9. [The 3D window (`viewer.py`)](#9-the-3d-window-viewerpy)
-10. [Notebooks (`plot.py` and `notebook.py`)](#10-notebooks-plotpy-and-notebookpy)
-11. [How to extend cfsim](#11-how-to-extend-cfsim)
-12. [Development setup and testing](#12-development-setup-and-testing)
-13. [Making a release](#13-making-a-release)
-14. [Design rules](#14-design-rules)
+10. [The browser view and room editor (`web.py`)](#10-the-browser-view-and-room-editor-webpy)
+11. [Notebooks (`plot.py` and `notebook.py`)](#11-notebooks-plotpy-and-notebookpy)
+12. [How to extend cfsim](#12-how-to-extend-cfsim)
+13. [Development setup and testing](#13-development-setup-and-testing)
+14. [Making a release](#14-making-a-release)
+15. [Design rules](#15-design-rules)
 
 ## 1. The idea
 
@@ -35,12 +36,13 @@ flowchart LR
     E --> D["SimDrone<br/>one per URI"]
     D --> W["World<br/>walls, raycasts"]
     E -->|"JSON lines on stdin, 20 Hz"| V["viewer.py<br/>separate process"]
+    E -->|"same messages as<br/>Server-Sent Events"| B["web.py + browser page<br/>(--viewer browser)"]
     E -->|"history, 10 Hz"| P["plot.py / notebook.py<br/>pictures in Jupyter"]
 ```
 
 Nothing in the student's script changes between the simulator and the real
 drone. That is the most important rule of the project (see
-[design rules](#14-design-rules)).
+[design rules](#15-design-rules)).
 
 ## 2. Repository layout
 
@@ -55,6 +57,9 @@ cfsim/                      repository root (pyproject.toml lives here)
 │   ├── viewer.py           the live 3D window (runs as its own process)
 │   ├── plot.py             Scene drawing for notebooks: show(), replay()
 │   ├── notebook.py         live picture below the running notebook cell
+│   ├── web.py              web server for the browser view and the room editor
+│   ├── web/                pages: viewer.html/js (three.js), editor.html/js,
+│   │                       style.css, sample-floorplan.png, vendor/ (three.js)
 │   ├── worlds/*.txt        built-in worlds
 │   └── _cflib/             the fake cflib (imported as "cflib")
 │       ├── crtp/           init_drivers(), scan_interfaces()
@@ -128,6 +133,7 @@ ignores them).
 | Swarm workers | `Swarm.parallel_safe()` | one thread per drone, like the real Swarm |
 | `cfsim-live` | `notebook.on_connect()` | redraws the live picture in notebooks every 0.3 s |
 | viewer **process** | `Engine._start_viewer()` | the matplotlib window; reads JSON lines on stdin |
+| `cfsim-web` + one thread per page | `WebView.start()` (`--viewer browser`, `--editor`) | the web server; each open page has a thread that streams events to it |
 
 All threads are daemon threads, so they never keep the script alive.
 
@@ -178,7 +184,10 @@ real time instead of slowing down. Each step:
 
 ### Talking to the viewer
 
-The engine writes one JSON object per line to the viewer's stdin:
+`viewer` is `'window'` (the default; `True` means the same), `'browser'` or
+`'none'` (`False`). For a window, the engine writes one JSON object per line to
+the viewer's stdin. For the browser, `_send()` hands the same objects to
+`web.WebView.send()` (see [section 10](#10-the-browser-view-and-room-editor-webpy)).
 
 | `type` | Content | When |
 | --- | --- | --- |
@@ -304,6 +313,11 @@ a few large boxes instead of many cells. That keeps raycasting fast.
 - `hits_wall(x, y, radius)`: circle–box test for collisions.
 - `World.load('open')` is a special world without walls or ceiling
   (`bounded=False`).
+- Optional header lines `image: plan.png` (relative to the map file) and
+  `image_box: x1 y1 x2 y2` (where the image lies, in metres) attach a floor
+  plan. The simulation ignores it; the browser view draws it on the floor.
+  The room editor writes such maps; they use a fine grid (`cell: 0.1`), and the
+  box merging turns a whole building into a few dozen boxes.
 
 ## 8. The fake cflib (`_cflib/`)
 
@@ -393,7 +407,84 @@ A reader thread parses the JSON lines into `_state`; a matplotlib
   backend and saves a PNG after that many seconds instead of opening a window.
   Useful for testing without a screen.
 
-## 10. Notebooks (`plot.py` and `notebook.py`)
+## 10. The browser view and room editor (`web.py`)
+
+`web.WebView` is a small web server (`http.server.ThreadingHTTPServer`, standard
+library only) that listens on **127.0.0.1** only. It starts at `port` (8765)
+and takes the next free port if that one is in use, up to 20 tries.
+
+| Path | What |
+| --- | --- |
+| `/` | the browser view, `web/viewer.html` |
+| `/editor` | the room editor, `web/editor.html` |
+| `/static/...` | files in `cfsim/web/` (no paths outside it) |
+| `/events` | Server-Sent Events: the engine's messages, one JSON object per event |
+| `/world-image` | the floor plan image of the current world, if it has one |
+| `POST /api/save-world` | the editor saves `name.txt` and `name.png` in the folder cfsim was started from |
+
+### The browser view
+
+With `viewer='browser'`, `Engine._start_web()` starts the server instead of the
+viewer process, and `Engine._send()` passes every message to `WebView.send()`.
+`WebView` keeps the world, the latest state, the trails and the last three
+messages, so a page that connects later can draw the current picture at once.
+Each page gets its own queue (200 messages); a page that is too slow skips
+pictures instead of slowing down the simulation.
+
+The `world` message gets a `session` id. A page left open reconnects
+(`retry: 1000`); when it sees a new session, it throws the old scene away and
+builds the new world. `open_page()` waits 1.5 s before opening the browser and
+does not open it if such a page has reconnected, so running a script again
+does not open a new tab every time.
+
+At exit, `_final_state()` waits up to 5 s for a page to connect (a short
+script may end before the browser has loaded the page), sends the final
+state and `end`, and waits 0.3 s so the page receives them. The page then shows
+"script finished" and keeps the last picture.
+
+`web/viewer.js` draws with three.js. The simulator's (x, y, z) is drawn at
+three.js (x, z, −y), because three.js has y up. Walls are one `InstancedMesh`
+(one box per wall box) plus their outlines; drones are small models scaled up
+for visibility, with a trail (`Line`, at most 3000 points), Multi-ranger rays
+and a line to the floor that shows the height. **Top** uses an orthographic
+camera, so it is a true map that lines up with the floor plan; **3D** and
+**Follow** use a perspective camera with `OrbitControls`.
+
+three.js is **bundled** in `web/vendor/` (version and source in
+`web/vendor/README.md`), because school networks may block CDNs or have no
+internet at all. The pages load it with an import map
+(`"three": "/static/vendor/three.module.js"`).
+
+### The room editor
+
+`python -m cfsim --editor` calls `web.run_editor()`: the server without a
+simulation, until Ctrl+C. Everything happens in the browser (`web/editor.js`);
+the server is only needed to save files.
+
+All user input is kept in **image pixel coordinates** (scale points, area,
+paint strokes, start spots), so changing the cell size or the thresholds never
+loses work. The wall grid is recomputed from it on every change:
+
+1. the image is converted once to brightness, at most 2000 px wide;
+2. for the current *Dark below* threshold, a summed-area table counts the dark
+   pixels of any rectangle in constant time;
+3. a cell is a wall if the dark part reaches *Cell is wall if*;
+4. paint and erase strokes (circles with a diameter in metres) are applied on
+   top.
+
+Saving writes an ordinary map: a border of `#` if *Close the outline* is on,
+`S` and `1`–`9` at the start spots, `cell:`, `height:`, and `image:` /
+`image_box:`. The image box is computed so that the top-left corner of the
+area is the top-left corner of the first grid cell; with the centre of the `S`
+cell as (0, 0) this gives the plan's position in metres. The area of the plan
+is saved as `name.png` (or `.jpg` for JPEG plans), at most 2400 px wide. The
+server only accepts names of letters, digits, `-` and `_`, and asks before
+overwriting.
+
+To test the editor, *Try the example plan* loads `web/sample-floorplan.png`
+(10 × 7 m; the dimension line is 10 m).
+
+## 11. Notebooks (`plot.py` and `notebook.py`)
 
 `plot.Scene` draws the world (walls as 3D faces and top-view rectangles, the
 beacon) once, and creates the artists for each drone (trail, position dot,
@@ -427,7 +518,7 @@ Figures for replay and the live picture are created with
 `matplotlib.figure.Figure` (not pyplot): pyplot would show them by itself in
 the notebook, and pyplot is not safe to use from a background thread.
 
-## 11. How to extend cfsim
+## 12. How to extend cfsim
 
 ### … add a log variable
 
@@ -456,6 +547,15 @@ Create the file under `_cflib/` with the same path as in cflib (for example
 finds it automatically. Update the "Supported:" list in the `ImportError`
 message in `cfsim/__init__.py`.
 
+### … change the browser view or the editor
+
+Edit the files in `cfsim/web/` and reload the page – the server reads them from
+disk on every request. New file types in `web/` must be added to
+`[tool.setuptools.package-data]` in `pyproject.toml`, or they are missing
+from the installed package. Test with
+`python -m cfsim --viewer browser examples/03_avoid_walls.py` and
+`python -m cfsim --editor`.
+
 ### … add a built-in world
 
 Put a `.txt` file in `cfsim/worlds/`. It is listed by `--list-worlds`
@@ -479,7 +579,7 @@ alias in `MODEL_ALIASES` if useful. Update the `--model` help text in
    the engine exists).
 5. Add it to the options table in the README.
 
-## 12. Development setup and testing
+## 13. Development setup and testing
 
 ```
 git clone https://github.com/clbokea/cfsim.git
@@ -539,7 +639,7 @@ Links in `docs/` must work both on GitHub and on the site:
   them into different anchors. Write `## 5. The engine (engine.py)`, not
   `## 5. The engine – engine.py`.
 
-## 13. Making a release
+## 14. Making a release
 
 Releases are GitHub releases with a zip and a wheel attached, so students can
 `pip install` a URL or a downloaded zip.
@@ -579,7 +679,7 @@ Releases are GitHub releases with a zip and a wheel attached, so students can
 Versioning: the patch number (1.0.**x**) for fixes and documentation, the minor
 number (1.**x**.0) for new features.
 
-## 14. Design rules
+## 15. Design rules
 
 1. **The same script flies the simulator and the real drone.** Never add
    simulator-only arguments to cflib functions. Simulator settings belong in

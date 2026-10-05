@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cfsim 3D view</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="importmap">
+    { "imports": { "three": "/static/vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="view"></div>
+
+  <div class="bar">
+    <div class="card"><span class="title">cfsim</span>
+      <span class="muted" id="world">–</span></div>
+    <div class="card"><span class="status-dot" id="dot"></span><span id="status">connecting…</span></div>
+    <div class="card" id="clock">t = 0.0 s</div>
+    <div class="card buttons">
+      <button data-cam="3d" class="on">3D</button>
+      <button data-cam="top">Top</button>
+      <button data-cam="follow">Follow</button>
+    </div>
+    <div class="card buttons">
+      <button data-toggle="trails" class="on">Trails</button>
+      <button data-toggle="rays" class="on">Sensors</button>
+      <button data-toggle="plan" class="on" id="planBtn" hidden>Floor plan</button>
+      <button data-toggle="walls" class="on">Walls</button>
+    </div>
+  </div>
+
+  <div id="drones"></div>
+  <div id="msgs"></div>
+  <div id="waiting" class="muted">Waiting for the simulator…</div>
+  <div id="help" class="card muted">Drag: rotate · Right-drag: move · Wheel: zoom</div>
+
+  <script type="module" src="/static/viewer.js"></script>
+</body>
+</html>

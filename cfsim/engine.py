@@ -25,7 +25,8 @@ _config = {
     'positioning': 'flow',     # flow | lighthouse | none
     'noise': True,
     'decks': ('flow', 'multiranger'),
-    'viewer': True,
+    'viewer': 'window',        # window | browser | none (True = window, False = none)
+    'port': 8765,              # first port tried for the browser view
     'battery_drain': 1.0,      # 10 = battery drains 10x faster
     'start_positions': {},     # uri -> (x, y)
     'quiet': False,
@@ -45,11 +46,21 @@ def configure(**options):
         model_name(options['model'])          # validate early
     if 'positioning' in options and options['positioning'] not in ('flow', 'lighthouse', 'none'):
         raise ValueError("positioning must be 'flow', 'lighthouse' or 'none'")
+    if 'viewer' in options:
+        options['viewer'] = viewer_mode(options['viewer'])
     if 'decks' in options:
         d = options['decks']
         options['decks'] = tuple(x.strip().lower() for x in
                                  (d.split(',') if isinstance(d, str) else d) if x.strip())
     _config.update(options)
+
+
+def viewer_mode(value):
+    mode = {True: 'window', False: 'none', None: 'none'}.get(value, value)
+    mode = str(mode).strip().lower()
+    if mode not in ('window', 'browser', 'none'):
+        raise ValueError("viewer must be 'window', 'browser' or 'none' (or True/False)")
+    return mode
 
 
 def get_engine():
@@ -71,8 +82,9 @@ class Engine:
         self.lock = threading.RLock()
         self.started = False
         self._t0 = None
-        self._viewer = None
-        self._viewer_ok = cfg['viewer']
+        self._viewer = None            # the window viewer process
+        self._web = None               # the browser view (web.WebView)
+        self._viewer_ok = viewer_mode(cfg['viewer']) != 'none'
         self._thread = None
         self.history = []          # (t, ((uri, x, y, z, yaw, crashed), ...))
         self.history_info = {}     # uri -> (label, color, model)
@@ -190,6 +202,8 @@ class Engine:
 
     # -------------------------------------------------------------- viewer
     def _start_viewer(self):
+        if viewer_mode(self.cfg['viewer']) == 'browser':
+            return self._start_web()
         try:
             import matplotlib  # noqa: F401  (check it is installed)
         except ImportError:
@@ -219,7 +233,22 @@ class Engine:
                 self._viewer = None
         threading.Thread(target=watch, args=(self._viewer,), daemon=True).start()
 
+    def _start_web(self):
+        from . import web
+        try:
+            self._web = web.WebView(self.cfg['port']).start()
+        except OSError as e:
+            self.message(f'could not start the browser view ({e}); running without it.')
+            self._viewer_ok = False
+            return
+        self._send({'type': 'world', 'world': self.world.to_dict()})
+        atexit.register(self._final_state)
+        self.message(f'3D view in your browser: {self._web.url}')
+        self._web.open_page()
+
     def _send(self, obj):
+        if self._web is not None:
+            self._web.send(obj)
         v = self._viewer
         if v is None:
             return
@@ -230,7 +259,7 @@ class Engine:
             self._viewer = None            # window was closed; keep simulating
 
     def _send_state(self, final=False):
-        if self._viewer is None:
+        if self._viewer is None and self._web is None:
             return
         self._frame = getattr(self, '_frame', 0) + 1
         with self.lock:
@@ -249,8 +278,14 @@ class Engine:
             if not falling:
                 break
             time.sleep(0.05)
+        if self._web is not None:
+            # A short script may end before the browser has opened the page:
+            # wait a little, so the page can still show the final picture.
+            self._web.wait_for_client(5.0)
         self._send_state(final=True)
         self._send({'type': 'end'})
+        if self._web is not None:
+            time.sleep(0.3)                    # let the page receive the last messages
         v = self._viewer
         if v is not None:
             try:

@@ -177,7 +177,9 @@ use `cfsim.enable(viewer=False)`, and look at the pictures from `cfsim.show()`.
 | `--no-noise` | `noise=False` | perfect sensors, no drift |
 | `--decks flow,multiranger` | `decks=('flow', 'multiranger')` | which decks are mounted |
 | `--battery-drain 10` | `battery_drain=10` | battery empties 10× faster |
-| `--no-viewer` | `viewer=False` | no window (faster, for testing) |
+| `--viewer browser` | `viewer='browser'` | live 3D view in the web browser instead of a window |
+| `--no-viewer` | `viewer=False` | no live view (faster, for testing) |
+| `--port 8765` | `port=8765` | first port tried for the browser view |
 | | `start_positions={uri: (x, y)}` | place drones yourself |
 | | `quiet=True` | hide simulator messages |
 | | `inline=False` | no live picture below notebook cells |
@@ -265,6 +267,38 @@ swarms, `B` a separate beacon position, `.` or space is free. The start `S`
 is position (0, 0); x points right and y points up on the map, and the drone
 starts facing +x (to the right). Run it with `--world my_world.txt`.
 
+### A world from a floor plan (room editor)
+
+To fly in a real building, make the world from an architectural drawing:
+
+```
+python -m cfsim --editor
+```
+
+The room editor opens in the browser. Load a floor plan image (PNG or JPG;
+export PDFs as an image first), set the scale by clicking two points with a
+known distance, choose the area, let the editor find the walls, clean up
+(erase text, furniture and door swings, paint missing walls), place the start
+`S`, and save. You get `my_room.txt` and the cropped plan image `my_room.png`
+in the folder where you started the editor; keep them together. Then:
+
+```
+python -m cfsim --viewer browser --world my_room.txt my_script.py
+```
+
+The browser view draws the floor plan on the floor under the walls. Saved
+worlds are ordinary text maps with a finer grid (`cell: 0.1`) and two extra
+lines, `image:` and `image_box:`, so they also work in the normal window.
+
+## 3D view in the browser
+
+`--viewer browser` (or `cfsim.enable(viewer='browser')`) shows the simulation
+in the web browser instead of a window: 3D or top view, trails, the
+Multi-ranger rays, battery and status of every drone. Leave the page open: the
+next run of a script updates it. It needs no extra installation, works without
+internet, and also works where no window can open (for example over SSH with
+port forwarding: `ssh -L 8765:127.0.0.1:8765 ...`).
+
 ## Examples
 
 | File | Shows |
@@ -321,6 +355,8 @@ Crazyradio; without cflib you get `ModuleNotFoundError: No module named
   `python -m cfsim my_script.py` for the simulator (or add `import cfsim` and
   `cfsim.enable()` at the top of the script). See
   [Running the examples](#running-the-examples-in-the-simulator).
+- **The browser view does not open**: open the address printed in the
+  terminal (`3D view in your browser: http://127.0.0.1:8765/`) yourself.
 - **No window appears**: first look behind your other windows, or for a
   Python icon in the Dock/taskbar. Then run `python -m cfsim.viewer --check`:
   it opens a test window, or prints why it can't (no screen, e.g. over SSH or

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cfsim room editor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="editor">
+  <div class="side">
+    <h1>cfsim room editor</h1>
+    <p class="muted small">Turn a floor plan into a world you can fly in:
+      <code>python -m cfsim --world name.txt my_script.py</code></p>
+
+    <section class="step" id="step1">
+      <h2><span class="n">1</span>Floor plan</h2>
+      <p class="small muted">A PNG or JPG image of the plan (export PDFs as an image first).</p>
+      <div class="row">
+        <input type="file" id="file" accept="image/png,image/jpeg">
+      </div>
+      <div class="row"><button id="sample">Try the example plan</button></div>
+      <p class="small" id="fileInfo"></p>
+    </section>
+
+    <section class="step" id="step2">
+      <h2><span class="n">2</span>Scale</h2>
+      <p class="small muted">Click <b>Measure</b>, then click two points on the plan whose
+        distance you know (a scale bar or a dimension line), and enter it.</p>
+      <div class="row">
+        <button id="measureBtn" data-tool="measure">Measure</button>
+        <input type="number" id="measureM" min="0.01" step="0.01" placeholder="metres">
+        <button id="setScale">Set</button>
+      </div>
+      <p class="small" id="scaleInfo">Not set.</p>
+    </section>
+
+    <section class="step" id="step3">
+      <h2><span class="n">3</span>Area <span class="muted small">(optional)</span></h2>
+      <p class="small muted">Drag a rectangle around the part you want – leave out titles
+        and dimension lines.</p>
+      <div class="row">
+        <button data-tool="crop">Select area</button>
+        <button id="resetCrop">Whole plan</button>
+      </div>
+    </section>
+
+    <section class="step" id="step4">
+      <h2><span class="n">4</span>Walls</h2>
+      <div class="row"><label for="cell">Cell size</label>
+        <select id="cell">
+          <option value="0.05">5 cm (detailed, slower)</option>
+          <option value="0.1" selected>10 cm</option>
+          <option value="0.2">20 cm</option>
+          <option value="0.25">25 cm</option>
+          <option value="0.5">50 cm</option>
+        </select></div>
+      <div class="row"><label for="thr">Dark below</label>
+        <input type="range" id="thr" min="20" max="250" value="140"><span id="thrV"></span></div>
+      <div class="row"><label for="fill">Cell is wall if</label>
+        <input type="range" id="fill" min="1" max="100" value="35"><span id="fillV"></span></div>
+      <div class="row"><label><input type="checkbox" id="outline" checked> Close the outline</label></div>
+      <p class="small muted">Clean up: paint missing walls, erase text, furniture and door
+        swings. Doors you want to fly through must be open (free).</p>
+      <div class="row">
+        <button data-tool="wall">Paint wall</button>
+        <button data-tool="erase">Erase</button>
+        <label for="brush" style="min-width:0">Brush</label>
+        <select id="brush">
+          <option value="0.1">10 cm</option>
+          <option value="0.25" selected>25 cm</option>
+          <option value="0.5">50 cm</option>
+          <option value="1">1 m</option>
+        </select>
+      </div>
+      <div class="row"><button id="clearEdits">Undo all paint/erase</button></div>
+      <p class="small" id="gridInfo"></p>
+    </section>
+
+    <section class="step" id="step5">
+      <h2><span class="n">5</span>Start spots</h2>
+      <p class="small muted"><b>S</b> is where the first drone takes off (position 0, 0) and the
+        radio beacon. Extra spots 1–9 are for swarms.</p>
+      <div class="row">
+        <button data-tool="start">Place S</button>
+        <button data-tool="extra">Add 1–9</button>
+        <button id="clearStarts">Clear</button>
+      </div>
+    </section>
+
+    <section class="step" id="step6">
+      <h2><span class="n">6</span>Save</h2>
+      <div class="row"><label for="name">Name</label>
+        <input type="text" id="name" value="my_room" pattern="[A-Za-z0-9_-]+"></div>
+      <div class="row"><label for="height">Ceiling</label>
+        <input type="number" id="height" value="2.5" min="0.5" max="20" step="0.1"> m</div>
+      <div class="row">
+        <button class="primary" id="save">Save in the folder</button>
+        <button id="download">Download</button>
+      </div>
+      <p class="small" id="saveResult"></p>
+    </section>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="hint card small" id="hint">Open a floor plan to start.</div>
+    <div class="legend card" id="legend" hidden>
+      <span style="background:#e53935aa"></span>wall
+      <span style="background:#3949ab"></span>start
+      <span style="background:#00000055"></span>outside the area
+    </div>
+  </div>
+</div>
+<script src="/static/editor.js"></script>
+</body>
+</html>

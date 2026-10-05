@@ -12,6 +12,10 @@ Lines starting with ';' are comments. Optional settings at the top:
 
     height: 2.5     ceiling height in metres
     cell: 0.5       cell size in metres
+    image: plan.png               floor plan shown on the floor in the browser
+    image_box: x1 y1 x2 y2        where the image lies, in metres (world coordinates)
+
+The room editor (python -m cfsim --editor) writes such maps from a floor plan.
 
 The world origin (0, 0) is the centre of the 'S' cell (or '1' if there is no
 'S'). +x points right on the map, +y points up on the map.
@@ -29,7 +33,7 @@ def builtin_worlds():
 
 class World:
     def __init__(self, name, boxes, bounds, height=2.5, starts=None,
-                 beacon=(0.0, 0.0), bounded=True):
+                 beacon=(0.0, 0.0), bounded=True, image=None, image_box=None):
         self.name = name
         self.boxes = boxes            # list of (x1, y1, x2, y2), x1 < x2, y1 < y2
         self.bounds = bounds          # (xmin, xmax, ymin, ymax) for the viewer
@@ -37,6 +41,8 @@ class World:
         self.starts = starts or [(0.0, 0.0)]
         self.beacon = beacon
         self.bounded = bounded        # False for 'open' (no ceiling either)
+        self.image = image            # path of a floor plan image, or None
+        self.image_box = image_box    # (x1, y1, x2, y2) of the image in metres
 
     # ------------------------------------------------------------------ load
     @classmethod
@@ -54,11 +60,12 @@ class World:
         with open(path, encoding='utf-8') as f:
             text = f.read()
         name = os.path.splitext(os.path.basename(path))[0]
-        return cls.from_text(text, name)
+        return cls.from_text(text, name, os.path.dirname(os.path.abspath(path)))
 
     @classmethod
-    def from_text(cls, text, name='custom'):
+    def from_text(cls, text, name='custom', base_dir='.'):
         height, cell = 2.5, 0.5
+        image, image_box = None, None
         grid = []
         for raw in text.splitlines():
             line = raw.rstrip('\n')
@@ -72,6 +79,14 @@ class World:
                     continue
                 if key == 'cell':
                     cell = float(val)
+                    continue
+                if key == 'image':
+                    image = os.path.join(base_dir, val.strip())
+                    continue
+                if key == 'image_box':
+                    image_box = tuple(float(v) for v in val.replace(',', ' ').split())
+                    if len(image_box) != 4:
+                        raise ValueError('image_box needs four numbers: x1 y1 x2 y2')
                     continue
             if line.strip() == '' and not grid:
                 continue
@@ -134,7 +149,13 @@ class World:
         xa, ya = to_xy(0, 0)
         xb, yb = to_xy(len(grid) - 1, ncols - 1)
         bounds = (xa - cell / 2, xb + cell / 2, yb - cell / 2, ya + cell / 2)
-        return cls(name, boxes, bounds, height, starts or [(0.0, 0.0)], beacon)
+        if image is not None and not os.path.isfile(image):
+            raise ValueError(f'The floor plan image of world {name!r} was not found: {image} '
+                             f'(keep it in the same folder as the .txt file)')
+        if image is not None and image_box is None:
+            image_box = bounds[0], bounds[2], bounds[1], bounds[3]
+        return cls(name, boxes, bounds, height, starts or [(0.0, 0.0)], beacon,
+                   image=image, image_box=image_box)
 
     # -------------------------------------------------------------- queries
     def raycast(self, x, y, dx, dy, max_range, circles=()):
@@ -184,4 +205,5 @@ class World:
     def to_dict(self):
         return {'name': self.name, 'boxes': self.boxes, 'bounds': self.bounds,
                 'height': self.height, 'beacon': self.beacon,
-                'bounded': self.bounded}
+                'bounded': self.bounded, 'starts': self.starts,
+                'image_path': self.image, 'image_box': self.image_box}

@@ -58,7 +58,7 @@ class _CflibAliasFinder(importlib.abc.MetaPathFinder):
 
 def enable(world='room', model='2.1+', positioning='flow', noise=True,
            decks=('flow', 'multiranger'), viewer=True, battery_drain=1.0,
-           models=None, start_positions=None, quiet=False, inline=True):
+           models=None, start_positions=None, quiet=False, inline=True, port=8765):
     """Switch cflib to the simulator. Call before importing anything from cflib.
 
     world:           'room', 'corridor', 'maze', 'obstacles', 'arena', 'open'
@@ -69,12 +69,15 @@ def enable(world='room', model='2.1+', positioning='flow', noise=True,
                      'lighthouse' (absolute, accurate) or 'none'
     noise:           sensor noise and position drift on/off
     decks:           which decks are mounted: 'flow', 'multiranger'
-    viewer:          open the live view window
+    viewer:          'window' (or True): the live 3D window,
+                     'browser': the live 3D view in the web browser,
+                     'none' (or False): no live view
     battery_drain:   e.g. 10 makes the battery run out 10x faster
     start_positions: {uri: (x, y)} to place drones yourself
     quiet:           do not print simulator messages
     inline:          in a Jupyter notebook, show a live picture below the
                      running cell (False: only the separate window)
+    port:            first port tried for the browser view (8765)
     """
     global _enabled
     existing = sys.modules.get('cflib')
@@ -87,7 +90,7 @@ def enable(world='room', model='2.1+', positioning='flow', noise=True,
                      decks=decks, viewer=viewer, battery_drain=battery_drain,
                      models=dict(models or {}),
                      start_positions=dict(start_positions or {}), quiet=quiet,
-                     inline=inline)
+                     inline=inline, port=port)
     engine.World.load(world)                 # fail early on a bad world name
     if not _enabled:
         sys.meta_path.insert(0, _CflibAliasFinder())

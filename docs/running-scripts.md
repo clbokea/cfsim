@@ -90,7 +90,8 @@ python -m cfsim --help
 | `--no-noise` | perfect sensors and no drift – good for checking your logic |
 | `--decks flow,multiranger` | which decks are mounted (default: both) |
 | `--battery-drain 10` | the battery runs out 10× faster |
-| `--no-viewer` | no window (faster; for testing) |
+| `--viewer browser` | show the simulation in the web browser instead of a window |
+| `--no-viewer` | no live view (faster; for testing) |
 | `--list-worlds` | show the built-in worlds |
 
 ### The examples
@@ -107,6 +108,22 @@ python -m cfsim examples/06_low_level_setpoints.py
 ```
 
 The first lines of each example say what it shows and how to run it.
+
+### The 3D view in the browser
+
+```
+python -m cfsim --viewer browser my_script.py
+```
+
+Instead of a window, the simulation opens in your web browser: the room in 3D
+or from the top, the drone with its trail, the Multi-ranger rays, and battery
+and status of every drone. The buttons at the top switch between **3D**,
+**Top** and **Follow** (the camera follows the first drone) and show or hide
+trails, sensor rays, the floor plan and the walls.
+
+Leave the page open while you work: the next run of a script updates it
+instead of opening a new tab. If the browser does not open by itself, open the
+address the terminal prints (`http://127.0.0.1:8765/`).
 
 ## 3. Run a script with the editor's Run button
 
@@ -224,6 +241,55 @@ height: 2.5
 spots, `B` a separate beacon, `.` free. Run it with
 `python -m cfsim --world my_world.txt my_script.py`.
 
+### A room from a floor plan
+
+To fly in a real building – your classroom, the lab, the hall – make the world
+from an architectural drawing with the **room editor**:
+
+```
+python -m cfsim --editor
+```
+
+It opens in the browser and saves into the folder you started it from.
+
+1. **Floor plan** – choose a PNG or JPG image of the plan. (A PDF must be
+   exported as an image first, e.g. with *Export* in Preview or a screenshot.)
+   *Try the example plan* loads a small demo building.
+2. **Scale** – click **Measure**, click both ends of a dimension line or a scale
+   bar, type its length in metres and press Enter.
+3. **Area** – drag a rectangle around the part you want, without titles and
+   dimension lines.
+4. **Walls** – dark parts of the plan become walls (red). *Dark below* sets how
+   dark a pixel must be, *Cell is wall if* how much of a cell must be dark;
+   *Cell size* is the grid (10 cm is a good start). Then clean up with
+   **Erase** (text, furniture, door swings, dimension lines) and
+   **Paint wall** (gaps that should be closed). Doors you want to fly through
+   must be free. *Close the outline* adds a wall around the area.
+5. **Start spots** – **Place S** where the first drone takes off; **Add 1–9**
+   for more drones.
+6. **Save** – give it a name and the ceiling height, and click
+   **Save in the folder**. You get `name.txt` (the world) and `name.png`
+   (the cropped plan). Keep both in the same folder.
+
+Then fly in it:
+
+```
+python -m cfsim --viewer browser --world name.txt my_script.py
+```
+
+The floor plan is drawn on the floor under the walls, so you can check that
+the walls are in the right places. The world also works in the normal window
+and in notebooks (`cfsim.enable(world='name.txt')`).
+
+Tips:
+
+- The cleaner the drawing, the less cleaning up. Plans with only walls (no
+  furniture layer) work best.
+- Check the scale: the editor shows the size of the plan in metres after
+  step 2.
+- A wall thinner than one cell may get gaps; use a smaller cell size, a lower
+  *Cell is wall if*, or paint it.
+
 ## 8. When something does not work
 
 | Problem | What to do |
@@ -232,6 +298,7 @@ spots, `B` a separate beacon, `.` free. Run it with
 | `No module named 'cfsim'` | cfsim is not installed in this Python. Activate the virtual environment, or use `uv run`. |
 | `cflib was imported before cfsim.enable()` | Move `import cfsim` / `cfsim.enable()` to the very top. |
 | `... is not available in the cfsim simulator` | The script uses a part of cflib that cfsim does not simulate. |
+| The browser view does not open | Open the address printed in the terminal (`http://127.0.0.1:8765/`) yourself. |
 | No window | Look behind other windows. Run `python -m cfsim.viewer --check`; it tells you what is missing. |
 | The drone does nothing | Read the `[cfsim]` messages in the terminal: not armed, thrust lock, crashed, battery empty, ... |
 | The drone crashes into a wall | Expected – it happens on the real drone too. Use the Multi-ranger to keep a distance. |
