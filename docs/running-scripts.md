@@ -33,7 +33,7 @@ because it creates the virtual environment for you.
 ```
 uv init drone-course
 cd drone-course
-uv add "cfsim @ https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip"
+uv add "cfsim @ https://github.com/clbokea/cfsim/releases/download/v1.0.4/cfsim-1.0.4.zip"
 ```
 
 Then put `uv run` in front of every command in this guide, for example
@@ -44,7 +44,7 @@ Then put `uv run` in front of every command in this guide, for example
 ```
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip
+pip install https://github.com/clbokea/cfsim/releases/download/v1.0.4/cfsim-1.0.4.zip
 ```
 
 **In a clone of this repository** (to try the examples):
@@ -171,7 +171,7 @@ What you see in a notebook:
 In Google Colab, install in the first cell:
 
 ```
-!pip install https://github.com/clbokea/cfsim/releases/download/v1.0.3/cfsim-1.0.3.zip
+!pip install https://github.com/clbokea/cfsim/releases/download/v1.0.4/cfsim-1.0.4.zip
 ```
 
 ## 5. Several drones

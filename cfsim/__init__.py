@@ -16,7 +16,7 @@ import importlib.abc
 import importlib.util
 import sys
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
 __all__ = ['enable', 'is_enabled', 'worlds', 'show', 'replay', 'reset']
 
 _enabled = False
