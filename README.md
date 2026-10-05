@@ -280,8 +280,8 @@ The room editor opens in the browser and has four steps:
 1. **Open the floor plan** (PNG or JPG; export PDFs as an image first). The
    editor finds the building and its walls by itself; text, door swings,
    furniture and dimension lines are cleaned away automatically.
-2. **Type how wide the building is** – the overall width written on the plan.
-   That one number sets the scale.
+2. **Type how wide the building is** – the overall width written on the plan,
+   in metres, cm or mm. That one number sets the scale.
 3. **Click where the drone starts.**
 4. **Save.** You get `my_room.txt` and the plan image `my_room.png` in the
    folder where you started the editor; keep them together.

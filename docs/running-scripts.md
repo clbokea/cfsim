@@ -260,8 +260,9 @@ It opens in the browser and saves into the folder you started it from.
    are removed automatically.
 2. **How wide is the building?** – type the overall width from the
    measurements on the plan (the dimension along the whole building, outside
-   wall to outside wall) and press Enter. The editor then shows the size of
-   the building in metres – check the depth against the plan too.
+   wall to outside wall), choose its unit (m, cm or mm – plans often use cm
+   or mm) and press Enter. The editor then shows the size of the building in
+   metres – check the depth against the plan too.
 3. **Where does the drone start?** – click on the plan where the drone takes
    off.
 4. **Save** – give it a name and click **Save in the folder**. You get
@@ -286,15 +287,17 @@ and in notebooks (`cfsim.enable(world='name.txt')`).
 | You know another length, not the width | *Scale from another measurement*: **Measure**, click both ends, type the length. |
 | A wall has gaps or is missing | **Paint wall**, or lower *Cell is wall if*. |
 | Something that is not a wall is red | **Erase** it, or choose a stronger *Clean-up*. |
-| Thin walls disappear | Choose *Clean-up: lines under 3 cm* or *off*. |
-| Walls are drawn as two thin lines (not filled) | Set *Clean-up* to *off*, lower *Cell is wall if*, and paint the walls where needed. |
+| Thin walls disappear | Choose *Clean-up: off*, or lower *Dark below* if the walls are grey. |
+| The size is far too big or small | Check the unit next to the width (m, cm or mm). |
+| Walls are drawn as two thin lines (not filled) | Usually fine: both lines become walls. If there are gaps, lower *Cell is wall if* or paint them. |
 | A door should be open | **Erase** the wall across the doorway – the drone can only fly through free cells. |
 | More drones | **Add start 1–9**. |
 
 Tips:
 
-- Plans where walls are filled black or grey (the usual 1:100 or 1:50
-  architectural style) work best.
+- Both styles work: walls filled black or grey (the usual 1:100 or 1:50
+  architectural style) and walls drawn as one dark line. For thin walls the
+  editor uses 5 cm cells automatically.
 - Doors drawn closed (a line across the opening) stay closed only if the line
   is thick; thin door lines are removed by the clean-up, so doors are open.
 

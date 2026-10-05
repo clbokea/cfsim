@@ -23,10 +23,15 @@
     <section class="step" id="step2">
       <h2><span class="n">2</span>How wide is the building?</h2>
       <p class="small muted" id="widthHelp">The blue box shows the building the editor found.
-        Type its width from the measurements on the plan.</p>
+        Type its width from the measurements on the plan, in the plan's unit.</p>
       <div class="row">
-        <input type="number" id="widthM" min="0.1" step="0.01" placeholder="e.g. 10">
-        <span>m wide</span>
+        <input type="number" id="widthM" min="0.1" step="any" placeholder="e.g. 10">
+        <select id="widthUnit" aria-label="unit">
+          <option value="1" selected>m</option>
+          <option value="0.01">cm</option>
+          <option value="0.001">mm</option>
+        </select>
+        <span>wide</span>
         <button id="setWidth">OK</button>
       </div>
       <p class="small" id="scaleInfo"></p>

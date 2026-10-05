@@ -464,35 +464,46 @@ the server is only needed to save files.
 The simple flow is: open → the building is found → type its width → click
 the start → save. Everything else is under the collapsed *Fine-tune*.
 
-**Finding the building** (`detectBuilding()`): the dark pixels are eroded with
-a small square (about 1/600 of the image size), which leaves only thick lines.
-A flood fill finds the connected groups; the largest one is the building,
-because walls are connected to each other, while a scale bar, a title block or
-a legend next to the plan are separate groups. Its bounding box (grown back by
-the erosion size) becomes the area. Typing the building's width then gives the
-scale: metres per pixel = width / box width.
+**Finding the building** (`detectBuilding()`): `components()` labels the
+connected groups of dark pixels (8-connected) and measures, for every pixel,
+the thickness of the line through it (the shorter of its horizontal and
+vertical dark runs). The building is the group with the largest bounding box –
+the walls enclose the rooms, so they win against text, door swings, dimension
+lines and scale bars; a frame around the whole sheet is skipped. The median
+line thickness of its pixels is the wall thickness `S.wallT`. Its bounding box
+becomes the area; typing the building's width (in m, cm or mm) gives the scale:
+metres per pixel = width / box width.
+
+This works for walls drawn filled (thick) and as single lines (thin). An
+earlier version found the building by erosion (keeping only thick lines),
+which erased thin walls completely and then picked the wrong box.
 
 All user input is kept in **image pixel coordinates** (scale points, area,
 paint strokes, start spots), so changing the cell size or the thresholds never
 loses work. The wall grid is recomputed from it on every change:
 
 1. the image is converted once to brightness, at most 2000 px wide;
-2. **clean-up**: a morphological *opening* of the dark pixels (an erosion and
-   then a dilation with a square of the clean-up size, 6 cm by default)
-   removes every line thinner than that – text, door swings, furniture,
-   dimension lines – and keeps walls and pillars almost unchanged. Erosion and
-   dilation are done with summed-area tables, so they take the same time for
-   any square size;
+2. **clean-up** (`wallTable()`): keep the building's group, and other groups
+   that look like walls (at least 40 cm long and at least 60 % as thick as the
+   building's walls) or pillars (a solid block, at least 10 cm and as thick as
+   the walls). This drops text, dashed door swings, dimension lines and
+   furniture drawn thinner than the walls. Then a morphological *opening*
+   (erosion then dilation with a square) removes lines thinner than the
+   clean-up size (6 cm by default) – but never thinner than 70 % of the wall
+   thickness, so thin walls stay. Erosion and dilation use summed-area
+   tables, so they take the same time for any square size;
 3. a summed-area table of the cleaned pixels counts the dark pixels of any
    cell in constant time; a cell is a wall if the dark part reaches *Cell is
-   wall if*;
+   wall if* – or 40 % of what a wall line covers in a cell, if that is less
+   (a thin wall line covers only a small part of a cell). For thin walls the
+   cell size is set to 5 cm automatically (`autoCellSize()`), so rooms do not
+   shrink by a whole 10 cm cell per wall;
 4. groups of wall cells smaller than about 0.03 m² (specks) are removed;
 5. paint and erase strokes (circles with a diameter in metres) are applied on
    top.
 
-The clean-up assumes filled walls. Plans that draw walls as two thin outlines
-lose them in step 2; the user guide explains the workaround (clean-up off, a
-lower coverage, painting).
+Plans that draw each wall as two thin parallel outlines get both outlines
+as walls (with free cells between them), which still blocks the drone.
 
 Saving writes an ordinary map: a border of `#` if *Close the outline* is on,
 `S` and `1`–`9` at the start spots, `cell:`, `height:`, and `image:` /

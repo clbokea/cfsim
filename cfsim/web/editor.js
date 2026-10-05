@@ -28,6 +28,8 @@ const S = {
   img: null, fileName: '', type: 'image/png',
   lum: null, ww: 0, wh: 0, ws: 1,          // brightness image and its scale
   satKey: '', sat: null,                   // summed-area table of cleaned dark pixels
+  comps: null,                             // connected groups of dark pixels
+  building: -1, wallT: null,               // the building's group, its wall thickness (px)
   scale: null,                             // metres per image pixel
   measure: [],                             // up to two points
   crop: null,                              // {x, y, w, h}
@@ -75,6 +77,7 @@ function loadImage(src, fileName, type) {
       S.lum[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) | 0;
     }
     S.satKey = '';
+    S.comps = null;
     const box = detectBuilding();
     if (box) S.crop = box;
     $('widthHelp').innerHTML = box
@@ -160,61 +163,129 @@ function dilate(mask, r) {
   return out;
 }
 
-// Square radius (brightness image px) that removes lines thinner than the
-// clean-up size: an opening with a (2r+1) square removes anything thinner.
-function cleanRadius() {
-  const t = +$('clean').value;
-  if (!t || !S.scale) return 0;
-  return Math.max(0, Math.round((t / S.scale * S.ws - 1) / 2));
-}
-
-// Summed-area table of the cleaned dark pixels (cached).
-function wallTable(thr, r) {
-  const key = thr + '/' + r;
-  if (S.satKey !== key) {
-    let mask = darkMask(thr);
-    if (r > 0) mask = dilate(erode(mask, r), r);     // opening
-    S.sat = summed(mask);
-    S.satKey = key;
+// Connected groups of dark pixels (8-connected) for a darkness threshold,
+// with the bounding box, pixel count and mean line thickness of each group.
+// The thickness of a line through a pixel is the shorter of its horizontal
+// and vertical dark runs.
+function components(thr) {
+  if (S.comps && S.comps.thr === thr) return S.comps;
+  const W = S.ww, H = S.wh, N = W * H;
+  const mask = darkMask(thr);
+  const thick = new Uint16Array(N);
+  for (let y = 0; y < H; y++) {              // horizontal runs
+    let x = 0;
+    while (x < W) {
+      if (!mask[y * W + x]) { x++; continue; }
+      let e = x;
+      while (e < W && mask[y * W + e]) e++;
+      for (let k = x; k < e; k++) thick[y * W + k] = Math.min(65535, e - x);
+      x = e;
+    }
   }
-  return S.sat;
-}
-
-// The building: the largest connected group of thick dark lines (walls are
-// connected; text, a scale bar or a title block next to it are separate).
-// Returns its bounding box in image pixels, or null.
-function detectBuilding() {
-  const r = Math.max(1, Math.round(Math.max(S.ww, S.wh) / 600));
-  const thick = erode(darkMask(+$('thr').value), r);
-  const seen = new Uint8Array(thick.length);
-  const stack = new Int32Array(thick.length);
-  let best = null;
-  for (let start = 0; start < thick.length; start++) {
-    if (!thick[start] || seen[start]) continue;
-    let n = 0, top = 0;
-    let x0 = S.ww, y0 = S.wh, x1 = 0, y1 = 0;
+  for (let x = 0; x < W; x++) {              // vertical runs: keep the shorter one
+    let y = 0;
+    while (y < H) {
+      if (!mask[y * W + x]) { y++; continue; }
+      let e = y;
+      while (e < H && mask[e * W + x]) e++;
+      for (let k = y; k < e; k++) thick[k * W + x] = Math.min(thick[k * W + x], e - y);
+      y = e;
+    }
+  }
+  const label = new Int32Array(N).fill(-1);
+  const stack = new Int32Array(N);
+  const list = [];
+  for (let start = 0; start < N; start++) {
+    if (!mask[start] || label[start] >= 0) continue;
+    const id = list.length;
+    let n = 0, sumT = 0, top = 0;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0;
     stack[top++] = start;
-    seen[start] = 1;
+    label[start] = id;
     while (top) {
       const i = stack[--top];
-      const x = i % S.ww, y = (i / S.ww) | 0;
+      const x = i % W, y = (i / W) | 0;
       n++;
+      sumT += thick[i];
       if (x < x0) x0 = x; if (x > x1) x1 = x;
       if (y < y0) y0 = y; if (y > y1) y1 = y;
-      for (const j of [i - 1, i + 1, i - S.ww, i + S.ww]) {
-        if (j < 0 || j >= thick.length || seen[j] || !thick[j]) continue;
-        if ((j === i - 1 || j === i + 1) && ((j / S.ww) | 0) !== y) continue;   // row wrap
-        seen[j] = 1;
-        stack[top++] = j;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= W) continue;
+          const j = yy * W + xx;
+          if (mask[j] && label[j] < 0) { label[j] = id; stack[top++] = j; }
+        }
       }
     }
-    if (!best || n > best.n) best = { n, x0, y0, x1, y1 };
+    list.push({ n, t: sumT / n, x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 });
   }
-  if (!best || best.n < 0.0005 * S.ww * S.wh) return null;
-  // undo the erosion (r px on each side), back to image pixels
-  const x = Math.max(0, best.x0 - r), y = Math.max(0, best.y0 - r);
-  const w = Math.min(S.ww, best.x1 + r + 1) - x, h = Math.min(S.wh, best.y1 + r + 1) - y;
-  return { x: x / S.ws, y: y / S.ws, w: w / S.ws, h: h / S.ws };
+  S.comps = { thr, mask, label, thick, list };
+  return S.comps;
+}
+
+// The building: the group of dark lines with the largest outline. The walls
+// enclose the rooms, so they win against text, door swings and dimension
+// lines; a frame around the whole sheet is skipped. Also measures the
+// thickness of its walls (S.wallT, brightness image px). Returns the
+// building's box in image pixels, or null.
+function detectBuilding() {
+  const c = components(+$('thr').value);
+  let best = -1, bestArea = 0;
+  c.list.forEach((g, i) => {
+    if (g.w >= 0.97 * S.ww && g.h >= 0.97 * S.wh) return;       // sheet frame
+    if (g.w < 0.05 * S.ww || g.h < 0.05 * S.wh) return;          // a line or a word
+    if (g.w * g.h > bestArea) { best = i; bestArea = g.w * g.h; }
+  });
+  S.building = best;
+  S.wallT = null;
+  S.satKey = '';
+  if (best < 0) return null;
+  // wall thickness: the median line thickness of the building's pixels
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < c.label.length; i++) {
+    if (c.label[i] === best) hist[Math.min(255, c.thick[i])]++;
+  }
+  const half = c.list[best].n / 2;
+  let sum = 0;
+  for (let t = 0; t < 256; t++) { sum += hist[t]; if (sum >= half) { S.wallT = Math.max(1, t); break; } }
+  const g = c.list[best];
+  return { x: g.x0 / S.ws, y: g.y0 / S.ws, w: g.w / S.ws, h: g.h / S.ws };
+}
+
+// Summed-area table of the pixels that are walls (cached). With clean-up on:
+//  - keep the building's lines, and other groups that look like walls (at
+//    least 40 cm long and about as thick as the building's walls) or like
+//    pillars (a solid block of at least 10 cm); this drops text, dashed door
+//    swings, dimension lines and other thin or small things,
+//  - then remove lines thinner than the clean-up size with an opening - but
+//    never thinner than 70 % of the walls, so thin walls are kept.
+function wallTable(thr) {
+  const clean = +$('clean').value;
+  const key = [thr, clean, S.scale, S.building].join('/');
+  if (S.satKey === key) return S.sat;
+  const c = components(thr);
+  let mask = c.mask;
+  if (clean && S.scale) {
+    const T = S.wallT || 1;
+    const mPerPx = S.scale / S.ws;                             // metres per brightness px
+    const keep = c.list.map((g, i) => {
+      if (i === S.building) return true;
+      const wallLike = Math.max(g.w, g.h) * mPerPx >= 0.4 && g.t >= 0.6 * T;
+      const pillarLike = g.n >= 0.75 * g.w * g.h && Math.min(g.w, g.h) >= Math.max(T, 0.1 / mPerPx);
+      return wallLike || pillarLike;
+    });
+    mask = new Uint8Array(c.mask.length);
+    for (let i = 0; i < mask.length; i++) if (c.label[i] >= 0 && keep[c.label[i]]) mask[i] = 1;
+    const k = Math.min(clean / mPerPx, 0.7 * T);               // opening square size (px)
+    const r = Math.floor((k - 1) / 2);
+    if (r >= 1) mask = dilate(erode(mask, r), r);
+  }
+  S.sat = summed(mask);
+  S.satKey = key;
+  return S.sat;
 }
 
 // Remove groups of wall cells smaller than minCells (specks left by the plan).
@@ -252,9 +323,11 @@ function computeGrid() {
     $('gridInfo').innerHTML = '<span class="error">Too many cells – choose a bigger cell size or a smaller area.</span>';
     return;
   }
-  const clean = cleanRadius();
-  const sat = wallTable(+$('thr').value, clean);
-  const fill = +$('fill').value / 100;
+  const sat = wallTable(+$('thr').value);
+  // A thin wall line covers only a small part of a cell: lower the needed
+  // coverage to 40 % of what such a line covers, so thin walls are kept.
+  let fill = +$('fill').value / 100;
+  if (S.wallT) fill = Math.min(fill, 0.4 * S.wallT / (cellPx * S.ws));
   const W = S.ww + 1, ws = S.ws;
   const data = new Uint8Array(rows * cols);
   for (let r = 0; r < rows; r++) {
@@ -408,21 +481,31 @@ function setTool(t, toggle = false) {
 }
 document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool, true)));
 
+// Thin wall lines snap to whole cells: use 5 cm cells for them (unless the
+// user has chosen a cell size), so rooms do not shrink by 10 cm per wall.
+function autoCellSize() {
+  if (S.cellChosen || !S.wallT || !S.scale) return;
+  $('cell').value = S.wallT * S.scale / S.ws < 0.06 ? '0.05' : '0.1';
+}
+
 function scaleText() {
-  const c = S.crop;
-  return `The building is ${(c.w * S.scale).toFixed(2)} × ${(c.h * S.scale).toFixed(2)} m ` +
-    `(1 m = ${(1 / S.scale).toFixed(1)} px). Check it against the plan.`;
+  const c = S.crop, w = c.w * S.scale, h = c.h * S.scale;
+  const odd = w > 150 || w < 1
+    ? ' <span class="error">That is an unusual size – check the unit (m, cm or mm).</span>' : '';
+  return `The building is <b>${w.toFixed(2)} × ${h.toFixed(2)} m</b> ` +
+    `(1 m = ${(1 / S.scale).toFixed(1)} px). Check it against the plan.${odd}`;
 }
 
 $('setWidth').addEventListener('click', () => {
-  const m = parseFloat($('widthM').value);
+  const m = parseFloat($('widthM').value) * +$('widthUnit').value;
   if (!S.img) return;
   if (!(m > 0)) {
-    $('scaleInfo').innerHTML = '<span class="error">Type the width in metres, e.g. 10 or 12.5.</span>';
+    $('scaleInfo').innerHTML = '<span class="error">Type the width, e.g. 10 m or 400 cm.</span>';
     return;
   }
   S.scale = m / S.crop.w;
-  $('scaleInfo').textContent = scaleText();
+  autoCellSize();
+  $('scaleInfo').innerHTML = scaleText();
   setTool('start');
   update();
 });
@@ -432,7 +515,7 @@ $('autoCrop').addEventListener('click', () => {
   const box = detectBuilding();
   if (box) S.crop = box;
   else $('hint').textContent = 'No building found – select the area by hand.';
-  if (S.scale) $('scaleInfo').textContent = scaleText();
+  if (S.scale) $('scaleInfo').innerHTML = scaleText();
   update();
 });
 $('clean').addEventListener('input', update);
@@ -446,7 +529,9 @@ $('setScale').addEventListener('click', () => {
   const [a, b] = S.measure;
   S.scale = m / Math.hypot(a.x - b.x, a.y - b.y);
   $('widthM').value = (S.crop.w * S.scale).toFixed(2);
-  $('scaleInfo').textContent = scaleText();
+  $('widthUnit').value = '1';
+  autoCellSize();
+  $('scaleInfo').innerHTML = scaleText();
   S.measure = [];
   setTool(S.starts.length ? null : 'start');
   update();
@@ -459,7 +544,11 @@ $('resetCrop').addEventListener('click', () => {
 });
 $('clearEdits').addEventListener('click', () => { S.edits = []; update(); });
 $('clearStarts').addEventListener('click', () => { S.starts = []; update(); });
-for (const id of ['cell', 'thr', 'fill']) $(id).addEventListener('input', update);
+$('cell').addEventListener('input', () => { S.cellChosen = true; update(); });
+$('fill').addEventListener('input', update);
+// a new threshold gives new groups of dark pixels: find the building's walls
+// again (the area stays as it is)
+$('thr').addEventListener('input', () => { if (S.img) detectBuilding(); update(); });
 
 // ------------------------------------------------------------------ mouse
 const toImage = (e) => {
@@ -539,7 +628,7 @@ canvas.addEventListener('pointerup', () => {
     const x = Math.max(0, dragRect.x), y = Math.max(0, dragRect.y);
     const w = Math.min(iw, dragRect.x + dragRect.w) - x, h = Math.min(ih, dragRect.y + dragRect.h) - y;
     if (w > 10 && h > 10) S.crop = { x, y, w, h };
-    if (S.scale) $('scaleInfo').textContent = scaleText();
+    if (S.scale) $('scaleInfo').innerHTML = scaleText();
     dragRect = null;
     update();
   }
@@ -633,6 +722,7 @@ function exportImage() {
 }
 
 function prepare() {
+  computeGrid();                    // save exactly what the settings give now
   const name = $('name').value.trim();
   if (!/^[A-Za-z0-9_-]{1,60}$/.test(name)) throw new Error('Use only letters, digits, - and _ in the name.');
   const img = exportImage();
