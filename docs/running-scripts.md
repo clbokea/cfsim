@@ -194,7 +194,7 @@ Drones that touch each other crash, just like real ones.
 3. Remove `cfsim.enable()` from the script if you added it, and run
    `python my_script.py`.
 4. Fly carefully the first time. The simulator is a first check, not a
-   guarantee – see *Simplifications* in the [README](../README.md).
+   guarantee – see *Simplifications* in the [README](https://github.com/clbokea/cfsim#readme).
 
 Things that often differ on the real drone:
 

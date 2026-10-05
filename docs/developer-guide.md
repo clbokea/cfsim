@@ -9,13 +9,13 @@ How cfsim works inside, and how to change it. For using cfsim, see
 2. [Repository layout](#2-repository-layout)
 3. [How a script ends up in the simulator](#3-how-a-script-ends-up-in-the-simulator)
 4. [Threads and processes](#4-threads-and-processes)
-5. [The engine – `engine.py`](#5-the-engine--enginepy)
-6. [The drone model – `drone.py`](#6-the-drone-model--dronepy)
-7. [Worlds – `world.py`](#7-worlds--worldpy)
-8. [The fake cflib – `_cflib/`](#8-the-fake-cflib--_cflib)
-9. [The 3D window – `viewer.py`](#9-the-3d-window--viewerpy)
-10. [Notebooks – `plot.py` and `notebook.py`](#10-notebooks--plotpy-and-notebookpy)
-11. [How to …](#11-how-to-)
+5. [The engine (`engine.py`)](#5-the-engine-enginepy)
+6. [The drone model (`drone.py`)](#6-the-drone-model-dronepy)
+7. [Worlds (`world.py`)](#7-worlds-worldpy)
+8. [The fake cflib (`_cflib/`)](#8-the-fake-cflib-_cflib)
+9. [The 3D window (`viewer.py`)](#9-the-3d-window-viewerpy)
+10. [Notebooks (`plot.py` and `notebook.py`)](#10-notebooks-plotpy-and-notebookpy)
+11. [How to extend cfsim](#11-how-to-extend-cfsim)
 12. [Development setup and testing](#12-development-setup-and-testing)
 13. [Making a release](#13-making-a-release)
 14. [Design rules](#14-design-rules)
@@ -147,7 +147,7 @@ written while holding it:
 Rule of thumb: take the lock to read or change drone state, never call
 student code or slow drawing code while holding it.
 
-## 5. The engine – `engine.py`
+## 5. The engine (`engine.py`)
 
 ### Configuration
 
@@ -200,7 +200,7 @@ the script has ended.
 `history_info[uri] = (label, color, model)`. At most `HISTORY_MAX` samples (an
 hour of flying) are kept. `cfsim.reset()` clears drones and history.
 
-## 6. The drone model – `drone.py`
+## 6. The drone model (`drone.py`)
 
 `SimDrone` is deliberately simple: a point mass that follows velocity commands
 with a first-order delay. It does not simulate propellers or attitude control.
@@ -290,7 +290,7 @@ firmware.
 `rssi()` is a log-distance model to the world's beacon, for return-home
 exercises.
 
-## 7. Worlds – `world.py`
+## 7. Worlds (`world.py`)
 
 `World.from_text()` parses the map format (see the README). Each `#` cell
 becomes an axis-aligned box. Runs of `#` in a row are merged into one box,
@@ -305,7 +305,7 @@ a few large boxes instead of many cells. That keeps raycasting fast.
 - `World.load('open')` is a special world without walls or ceiling
   (`bounded=False`).
 
-## 8. The fake cflib – `_cflib/`
+## 8. The fake cflib (`_cflib/`)
 
 Every module copies the public interface of the matching cflib module, with
 the same names and argument lists, so student code does not notice the
@@ -367,7 +367,7 @@ blocks that are due, reads the values under the engine lock, and then calls
 the callbacks without the lock. Timestamps are milliseconds since the drone
 "booted".
 
-## 9. The 3D window – `viewer.py`
+## 9. The 3D window (`viewer.py`)
 
 The window runs in a **separate process** (`python -m cfsim.viewer`), because:
 
@@ -393,7 +393,7 @@ A reader thread parses the JSON lines into `_state`; a matplotlib
   backend and saves a PNG after that many seconds instead of opening a window.
   Useful for testing without a screen.
 
-## 10. Notebooks – `plot.py` and `notebook.py`
+## 10. Notebooks (`plot.py` and `notebook.py`)
 
 `plot.Scene` draws the world (walls as 3D faces and top-view rectangles, the
 beacon) once, and creates the artists for each drone (trail, position dot,
@@ -411,7 +411,7 @@ Three users of `Scene`:
   (quality 70) with matplotlib's `HTMLWriter` into a self-contained JavaScript
   player; that is about a third of the size of `to_jshtml()`'s PNG frames.
   More than `max_frames` frames speeds the replay up.
-- **The live picture** (`notebook.py`) – `on_connect()` is called from
+- **The live picture** (`notebook.py`) (`on_connect()`) is called from
   `Crazyflie.open_link()`. If we are in a Jupyter kernel, `inline` is on, and
   this cell has no picture yet (`execution_count`), it shows a PNG with
   `display(..., display_id=True)` and remembers the handle. The `cfsim-live`
@@ -427,7 +427,7 @@ Figures for replay and the live picture are created with
 `matplotlib.figure.Figure` (not pyplot): pyplot would show them by itself in
 the notebook, and pyplot is not safe to use from a background thread.
 
-## 11. How to …
+## 11. How to extend cfsim
 
 ### … add a log variable
 
@@ -513,6 +513,31 @@ get a picture of the final state.
 
 Keep the examples and the notebook free of outputs when committing
 (*Edit → Clear Outputs of All Cells* in JupyterLab).
+
+### The documentation site
+
+The files in `docs/` are published to <https://clbokea.github.io/cfsim/> with
+[MkDocs](https://www.mkdocs.org/) and the
+[Material theme](https://squidfunk.github.io/mkdocs-material/). The settings
+and the menu are in `mkdocs.yml`. Preview while you write:
+
+```
+uv run --group docs mkdocs serve      # http://127.0.0.1:8000, reloads on save
+```
+
+Every push to `main` that changes `docs/` is built and published by
+`.github/workflows/docs.yml` (see the *Actions* tab on GitHub). The build runs
+with `--strict`, so a broken link or a link to a heading that does not exist
+stops it. To add a page, create the `.md` file in `docs/` and add it to `nav`
+in `mkdocs.yml`.
+
+Links in `docs/` must work both on GitHub and on the site:
+
+- link to other pages with their file name: `[guide](running-scripts.md)`;
+- link to files outside `docs/` with a full GitHub URL;
+- avoid dashes and "…" in headings you link to: GitHub and MkDocs turn
+  them into different anchors. Write `## 5. The engine (engine.py)`, not
+  `## 5. The engine – engine.py`.
 
 ## 13. Making a release
 

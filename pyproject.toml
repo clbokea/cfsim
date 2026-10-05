@@ -13,11 +13,14 @@ dependencies = ["matplotlib>=3.5"]
 
 [project.urls]
 Homepage = "https://github.com/clbokea/cfsim"
+Documentation = "https://clbokea.github.io/cfsim/"
 
 [dependency-groups]
 # Not installed with cfsim itself. `uv sync` / `uv run` in this repo add them,
 # so `uv run jupyter lab examples/notebook_demo.ipynb` works out of the box.
 dev = ["jupyterlab>=4", "ipykernel"]
+# The documentation site: `uv run --group docs mkdocs serve`
+docs = ["mkdocs-material>=9.7", "mkdocs<2"]   # Material does not support MkDocs 2
 
 [tool.setuptools.packages.find]
 include = ["cfsim*"]

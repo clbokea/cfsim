@@ -11,9 +11,11 @@ python -m cfsim my_script.py      # simulator
 python my_script.py               # real Crazyflie (needs a Crazyradio)
 ```
 
-**Documentation:** [running scripts](docs/running-scripts.md) (step-by-step
-guide for students) · [developer guide](docs/developer-guide.md) (how cfsim
-works inside, how to extend and release it).
+**Documentation:** <https://clbokea.github.io/cfsim/> –
+[running scripts](https://clbokea.github.io/cfsim/running-scripts/) (step-by-step
+guide for students) · [developer guide](https://clbokea.github.io/cfsim/developer-guide/)
+(how cfsim works inside, how to extend and release it). The source is in
+[`docs/`](docs/).
 
 ## Installation
 
